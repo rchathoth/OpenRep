@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Chess } from "chess.js";
-import { Chessboard } from "react-chessboard";
+import { Chessboard, defaultPieces } from "react-chessboard";
 import type { PositionDataType } from "react-chessboard";
 
 type PositionSetupProps = { onStartTraining: (fen: string, playerSide: Side, boardOrientation: "white" | "black") => void };
@@ -38,6 +38,21 @@ function positionToFen(position: PositionDataType, side: Side) {
   return `${placement} ${side} ${rights} - 0 1`;
 }
 
+const PIECE_NAMES: Record<string, string> = {
+  wK: "White King",
+  wQ: "White Queen",
+  wR: "White Rook",
+  wB: "White Bishop",
+  wN: "White Knight",
+  wP: "White Pawn",
+  bK: "Black King",
+  bQ: "Black Queen",
+  bR: "Black Rook",
+  bB: "Black Bishop",
+  bN: "Black Knight",
+  bP: "Black Pawn",
+};
+
 export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
   const [position, setPosition] = useState<PositionDataType>(() => fenToPosition(STANDARD_FEN));
   const [side, setSide] = useState<Side>("w");
@@ -45,24 +60,144 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
   const [selectedPiece, setSelectedPiece] = useState("wP");
   const [error, setError] = useState<string | null>(null);
+
   function onPieceDrop({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string | null }) {
     if (!targetSquare) return false;
-    setPosition((current) => { const piece = current[sourceSquare]; if (!piece) return current; const next = { ...current }; delete next[sourceSquare]; next[targetSquare] = piece; return next; });
+    setPosition((current) => {
+      const piece = current[sourceSquare];
+      if (!piece) return current;
+      const next = { ...current };
+      delete next[sourceSquare];
+      next[targetSquare] = piece;
+      return next;
+    });
     return true;
   }
+
   function startTraining() {
     const whiteKing = Object.values(position).filter(({ pieceType }) => pieceType === "wK").length;
     const blackKing = Object.values(position).filter(({ pieceType }) => pieceType === "bK").length;
-    if (whiteKing !== 1 || blackKing !== 1) { setError("Training positions need exactly one white king and one black king."); return; }
+    if (whiteKing !== 1 || blackKing !== 1) {
+      setError("Training positions need exactly one white king and one black king.");
+      return;
+    }
     const fen = positionToFen(position, side);
-    try { new Chess(fen); }
-    catch { setError("This position is invalid. Check king placement and pawns on the first or last rank."); return; }
-    setError(null); onStartTraining(fen, playerSide, boardOrientation);
+    try {
+      new Chess(fen);
+    } catch {
+      setError("This position is invalid. Check king placement and pawns on the first or last rank.");
+      return;
+    }
+    setError(null);
+    onStartTraining(fen, playerSide, boardOrientation);
   }
-  return <section className="space-y-5">
-    <p className="setup-note">Drag pieces to arrange the position. Choose a piece below to add it; right-click to remove.</p>
-    <div className="board-shell"><Chessboard options={{ position, boardOrientation, onPieceDrop, onSquareClick: ({ square }) => setPosition((current) => ({ ...current, [square]: { pieceType: selectedPiece } })), onSquareRightClick: ({ square }) => setPosition((current) => { const next = { ...current }; delete next[square]; return next; }), allowDragOffBoard: true, boardStyle: { borderRadius: "12px" } }} /></div>
-    <div className="setup-controls"><div><p className="control-label">Piece to place</p><div className="piece-palette">{palette.map((piece) => <button key={piece} className={selectedPiece === piece ? "piece-choice active" : "piece-choice"} onClick={() => setSelectedPiece(piece)} aria-label={`Place ${piece}`}><span className={`piece-icon ${piece[0] === "w" ? "white" : "black"}`}>{piece[1]}</span></button>)}</div></div><div className="flex flex-wrap items-end gap-3"><label className="control-label">I play<select value={playerSide} onChange={(event) => { const next = event.target.value as Side; setPlayerSide(next); setBoardOrientation(next === "w" ? "white" : "black"); }} className="select-control"><option value="w">White</option><option value="b">Black</option></select></label><label className="control-label">Side to move<select value={side} onChange={(event) => setSide(event.target.value as Side)} className="select-control"><option value="w">White</option><option value="b">Black</option></select></label><button className="button-secondary" onClick={() => setBoardOrientation((current) => current === "white" ? "black" : "white")}>Flip board</button><button className="button-secondary" onClick={() => { setPosition(fenToPosition(STANDARD_FEN)); setSide("w"); setError(null); }}>Reset position</button><button className="button-primary" onClick={startTraining}>Start training <span aria-hidden>→</span></button></div></div>
-    {error && <p className="error-message" role="alert">{error}</p>}
-  </section>;
+
+  return (
+    <section className="space-y-5">
+      <p className="setup-note">
+        Drag pieces to arrange the position. Choose a piece below to add it; right-click to remove.
+      </p>
+      <div className="board-shell">
+        <Chessboard
+          options={{
+            position,
+            boardOrientation,
+            onPieceDrop,
+            onSquareClick: ({ square }) =>
+              setPosition((current) => ({ ...current, [square]: { pieceType: selectedPiece } })),
+            onSquareRightClick: ({ square }) =>
+              setPosition((current) => {
+                const next = { ...current };
+                delete next[square];
+                return next;
+              }),
+            allowDragOffBoard: true,
+            boardStyle: { borderRadius: "12px" },
+          }}
+        />
+      </div>
+      <div className="setup-controls">
+        <div className="piece-palette-wrap">
+          <div className="piece-header">
+            <p className="control-label">Piece to place</p>
+            <span className="piece-active-name">{PIECE_NAMES[selectedPiece]}</span>
+          </div>
+          <div className="piece-palette" role="group" aria-label="Pieces to place">
+            {palette.map((piece) => {
+              const PieceIcon = defaultPieces[piece];
+              return (
+                <button
+                  key={piece}
+                  type="button"
+                  className={selectedPiece === piece ? "piece-choice active" : "piece-choice"}
+                  onClick={() => setSelectedPiece(piece)}
+                  aria-label={`Place ${piece}`}
+                  aria-pressed={selectedPiece === piece}
+                  title={PIECE_NAMES[piece]}
+                >
+                  <span className="piece-svg-wrap">
+                    {PieceIcon ? (
+                      <PieceIcon />
+                    ) : (
+                      <span className={`piece-icon ${piece[0] === "w" ? "white" : "black"}`}>
+                        {piece[1]}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="control-label">
+            I play
+            <select
+              value={playerSide}
+              onChange={(event) => {
+                const next = event.target.value as Side;
+                setPlayerSide(next);
+                setBoardOrientation(next === "w" ? "white" : "black");
+              }}
+              className="select-control"
+            >
+              <option value="w">White</option>
+              <option value="b">Black</option>
+            </select>
+          </label>
+          <label className="control-label">
+            Side to move
+            <select
+              value={side}
+              onChange={(event) => setSide(event.target.value as Side)}
+              className="select-control"
+            >
+              <option value="w">White</option>
+              <option value="b">Black</option>
+            </select>
+          </label>
+          <button
+            className="button-secondary"
+            onClick={() => setBoardOrientation((current) => (current === "white" ? "black" : "white"))}
+          >
+            Flip board
+          </button>
+          <button
+            className="button-secondary"
+            onClick={() => {
+              setPosition(fenToPosition(STANDARD_FEN));
+              setSide("w");
+              setError(null);
+            }}
+          >
+            Reset position
+          </button>
+          <button className="button-primary" onClick={startTraining}>
+            Start training <span aria-hidden>→</span>
+          </button>
+        </div>
+      </div>
+      {error && <p className="error-message" role="alert">{error}</p>}
+    </section>
+  );
 }

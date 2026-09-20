@@ -5,6 +5,7 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import ErrorOverlay from "@/components/ErrorOverlay";
 import { applyUci, expectedMoveFor, toUci } from "@/lib/training";
+import { classifyHint, hintText, type HintClassification } from "@/lib/hints";
 
 type TrainerBoardProps = { startingFen: string; playerSide: "w" | "b"; boardOrientation: "white" | "black"; onBackToSetup: () => void };
 type Phase = "ready" | "checking" | "replying" | "error";
@@ -19,6 +20,7 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
   }, []);
   const [phase, setPhase] = useState<Phase>("ready");
   const [showError, setShowError] = useState(false);
+  const [hint, setHint] = useState<HintClassification | null>(null);
   const [promotion, setPromotion] = useState("q");
   const [message, setMessage] = useState("Find the engine's best move.");
   const pending = useRef<AbortController | null>(null);
@@ -77,6 +79,8 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
       const expected = await expectedMoveFor(before, controller.signal);
       if (controller.signal.aborted) return;
       if (attempted !== expected) {
+        // Preserve the first hint even if a later evaluation changes its top move.
+        setHint((current) => current ?? classifyHint(before, expected));
         setShowError(true);
         setMessage("Incorrect move. Try the strongest move.");
         if (errorTimer.current) clearTimeout(errorTimer.current);
@@ -84,6 +88,7 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
         return;
       }
       applyUci(game.current, attempted);
+      setHint(null);
       publish();
       // Validate, commit, then await the NEW position's reply under one lock.
       await reply(controller);
@@ -96,6 +101,9 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
     <div className="trainer-bar"><span>Playing {playerSide === "w" ? "White" : "Black"}</span><button className="button-secondary" onClick={onBackToSetup}>Setup</button></div>
     <div className="board-shell" data-fen={fen}><Chessboard options={{ position: fen, boardOrientation, onPieceDrop, allowDragging: !busy && !complete && playerTurn, boardStyle: { borderRadius: "8px" } }} /><ErrorOverlay visible={showError} />{busy && <div className="board-status">{phase === "checking" ? "Checking move…" : "Engine is thinking…"}</div>}</div>
     <div className="status-card" aria-live="polite"><span className={busy ? "status-dot loading" : "status-dot"} /><p>{complete ? `Training complete — ${mate ? "checkmate" : "draw"}.` : message}</p></div>
+    <div role="status" aria-label="Hint" aria-atomic="true">
+      {hint && !complete && <p className="hint-card"><strong>Hint</strong> {hintText(hint)}</p>}
+    </div>
     {phase === "error" && !complete && <div className="retry-row"><p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry evaluation." : "Your move was accepted. Retry to play the engine reply."}</p>{!playerTurn && <button className="button-secondary" onClick={() => void run(reply)}>Retry engine reply</button>}</div>}
     <div className="trainer-bar"><span>{plies} half-moves played · {complete ? "Game over" : `${playerTurn ? "Your" : "Engine's"} turn`}</span><label className="promotion-control">Promote to <select aria-label="Promotion piece" value={promotion} disabled={busy} onChange={(event) => setPromotion(event.target.value)}><option value="q">Queen</option><option value="r">Rook</option><option value="b">Bishop</option><option value="n">Knight</option></select></label></div>
   </section>;
