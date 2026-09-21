@@ -8,14 +8,20 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test tests/*.test.mjs",
-    "test:e2e": "node tests/trainer.e2e.cjs"
+    "test:e2e": "node tests/trainer.e2e.cjs",
+    "demo:engine": "node tests/engine-demo.cjs",
+    "prepare:engine": "node scripts/prepare-engine.mjs",
+    "predev": "npm run prepare:engine",
+    "prebuild": "npm run prepare:engine",
+    "prestart": "npm run prepare:engine"
   },
   "dependencies": {
     "chess.js": "^1.4.0",
     "next": "16.3.2",
     "react": "19.2.8",
     "react-chessboard": "^5.12.1",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "stockfish": "19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -24,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
+    "playwright": "1.63.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

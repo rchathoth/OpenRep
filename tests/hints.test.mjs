@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chess.js';
-import { classifyHint, hintText } from '../lib/hints.ts';
+import { classifyHint, hintText, parseMoveHint } from '../lib/hints.ts';
 
 const cases = [
   ['check', '7k/8/6Q1/8/8/8/8/K7 w - - 0 1', 'g6g7', ['forcing.check'], 'Look for checks.'],
@@ -28,3 +28,11 @@ for (const [name, fen, move, concepts, text] of cases) {
     assert.deepEqual(classifyHint(before, move), result);
   });
 }
+
+test('parseMoveHint decomposes standard and promotion UCI moves', () => {
+  assert.deepEqual(parseMoveHint('e2e4'), { fromSquare: 'e2', toSquare: 'e4', promotion: undefined });
+  assert.deepEqual(parseMoveHint('g1f3'), { fromSquare: 'g1', toSquare: 'f3', promotion: undefined });
+  assert.deepEqual(parseMoveHint('a7a8q'), { fromSquare: 'a7', toSquare: 'a8', promotion: 'q' });
+  assert.deepEqual(parseMoveHint('a7b8n'), { fromSquare: 'a7', toSquare: 'b8', promotion: 'n' });
+});
+

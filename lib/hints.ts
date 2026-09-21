@@ -36,3 +36,19 @@ export function classifyHint(fen: string, expectedMove: string): HintClassificat
 export function hintText(classification: HintClassification): string {
   return classification.primary === null ? fallbackHint : hintCatalog[classification.primary].text;
 }
+
+export type HintStage = 0 | 1 | 2;
+
+export type MoveHint = {
+  readonly fromSquare: string;
+  readonly toSquare: string;
+  readonly promotion?: string;
+};
+
+export function parseMoveHint(expectedMove: string): MoveHint {
+  return {
+    fromSquare: expectedMove.slice(0, 2),
+    toSquare: expectedMove.slice(2, 4),
+    promotion: expectedMove[4],
+  };
+}

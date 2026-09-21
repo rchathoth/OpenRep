@@ -91,5 +91,7 @@ button, select { font: inherit; } button { cursor: pointer; }
 .hint-card strong { display: block; margin-bottom: .2rem; color: #171717; }
 .promotion-control { display: flex; align-items: center; gap: .4rem; }
 .promotion-control select { border: 1px solid #ccc; border-radius: 3px; padding: .3rem; background: #fff; color: #171717; }
+.trainer-actions { display: flex; align-items: center; gap: .5rem; }
+.hint-highlighted-square { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
 button:focus-visible, select:focus-visible { outline: 2px solid #555; outline-offset: 3px; }
 @media (max-width: 500px) { .trainer-bar { flex-wrap: wrap; gap: .75rem; } }

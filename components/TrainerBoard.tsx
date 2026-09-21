@@ -4,13 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import ErrorOverlay from "@/components/ErrorOverlay";
-import { applyUci, expectedMoveFor, toUci } from "@/lib/training";
-import { classifyHint, hintText, type HintClassification } from "@/lib/hints";
+import { applyUci, getExpectedMove, toUci } from "@/lib/training";
+import { EngineClient } from "@/lib/engine/engine-client";
+import type { EngineStatus } from "@/lib/engine/types";
+import { ENGINE_ASSET_PATH } from "@/lib/engine/settings";
+import { classifyHint, hintText, parseMoveHint, type HintClassification, type HintStage } from "@/lib/hints";
 
 type TrainerBoardProps = { startingFen: string; playerSide: "w" | "b"; boardOrientation: "white" | "black"; onBackToSetup: () => void };
 type Phase = "ready" | "checking" | "replying" | "error";
 
-export default function TrainerBoard({ startingFen, playerSide, boardOrientation, onBackToSetup }: TrainerBoardProps) {
+export default function TrainerBoard(props: TrainerBoardProps) {
+  // A new position/side owns a new game and engine lifetime.
+  return <TrainingSession key={`${props.startingFen}:${props.playerSide}`} {...props} />;
+}
+
+function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSetup }: TrainerBoardProps) {
   // Preserve move history so repetition and other game-over rules still work.
   const game = useRef(new Chess(startingFen));
   const [snapshot, setSnapshot] = useState(() => ({ fen: startingFen, complete: new Chess(startingFen).isGameOver(), mate: new Chess(startingFen).isCheckmate(), plies: 0 }));
@@ -18,26 +26,46 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
   const publish = useCallback(() => {
     setSnapshot({ fen: game.current.fen(), complete: game.current.isGameOver(), mate: game.current.isCheckmate(), plies: game.current.history().length });
   }, []);
+  const engine = useRef<EngineClient | null>(null);
+  const [engineStatus, setEngineStatus] = useState<EngineStatus>("starting");
+  const expectedCache = useRef<{ fen: string; move: string } | null>(null);
   const [phase, setPhase] = useState<Phase>("ready");
   const [showError, setShowError] = useState(false);
   const [hint, setHint] = useState<HintClassification | null>(null);
+  const [hintStage, setHintStage] = useState<HintStage>(0);
+  const [expectedMove, setExpectedMove] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
   const [promotion, setPromotion] = useState("q");
   const [message, setMessage] = useState("Find the engine's best move.");
   const pending = useRef<AbortController | null>(null);
+  const hintAbort = useRef<AbortController | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const busy = phase === "checking" || phase === "replying";
+  const busy = engineStatus === "starting" || phase === "checking" || phase === "replying";
+  const unavailable = engineStatus === "unavailable";
   const playerTurn = new Chess(fen).turn() === playerSide;
+
+  const expectedForPosition = useCallback(async (signal: AbortSignal) => {
+    signal.throwIfAborted();
+    const position = game.current.fen();
+    if (expectedCache.current?.fen === position) return expectedCache.current.move;
+    if (!engine.current) throw new Error("Engine unavailable; reload to retry.");
+    const move = await getExpectedMove(game.current, signal, engine.current);
+    expectedCache.current = { fen: position, move };
+    return move;
+  }, []);
 
   const reply = useCallback(async (controller: AbortController) => {
     if (game.current.isGameOver()) return;
     setPhase("replying");
     setMessage("The engine is choosing its best reply…");
-    const move = await expectedMoveFor(game.current.fen(), controller.signal);
+    const move = await expectedForPosition(controller.signal);
     if (controller.signal.aborted) return;
     applyUci(game.current, move);
+    setHintStage(0);
+    setExpectedMove(null);
     publish();
     setMessage("Your turn — find the engine's best move.");
-  }, [publish]);
+  }, [publish, expectedForPosition]);
 
   const run = useCallback(async (action: (controller: AbortController) => Promise<void>) => {
     if (pending.current) return;
@@ -49,37 +77,107 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
     } catch (error) {
       if (!controller.signal.aborted) {
         setPhase("error");
-        setMessage(error instanceof Error ? error.message : "Evaluation failed. Please retry.");
+        setMessage(error instanceof Error ? error.message : "Engine search failed. Please retry.");
       }
     } finally {
       if (pending.current === controller) pending.current = null;
     }
   }, []);
 
+  const handleHint = useCallback(async () => {
+    if (busy || unavailable || complete || !playerTurn || hintLoading || hintAbort.current || pending.current) return;
+    if (hintStage === 1) {
+      setHintStage(2);
+      return;
+    }
+    if (hintStage === 2) {
+      setHintStage(0);
+      return;
+    }
+    // hintStage === 0
+    if (expectedMove) {
+      setHintStage(1);
+      return;
+    }
+    const controller = new AbortController();
+    hintAbort.current = controller;
+    setHintLoading(true);
+    try {
+      const move = await expectedForPosition(controller.signal);
+      if (controller.signal.aborted) return;
+      setExpectedMove(move);
+      setHintStage(1);
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setMessage(error instanceof Error ? error.message : "Could not get a hint. Please retry.");
+      }
+    } finally {
+      if (hintAbort.current === controller) {
+        hintAbort.current = null;
+        setHintLoading(false);
+      }
+    }
+  }, [busy, unavailable, complete, playerTurn, hintLoading, hintStage, expectedMove, expectedForPosition]);
+
   useEffect(() => {
+    let mounted = true;
+    const client = new EngineClient({ onStatus: (status) => { if (mounted) setEngineStatus(status); } });
+    engine.current = client;
     // Covers starting as Black or from any opponent-to-move position.
-    if (game.current.turn() !== playerSide && !game.current.isGameOver()) void run(reply);
-    return () => {
+    void client.initialize().then(() => {
+      if (!mounted || game.current.turn() === playerSide || game.current.isGameOver()) return;
+      if (document.visibilityState === "hidden") {
+        setPhase("error");
+        setMessage("Engine search paused while this tab was hidden. Please retry.");
+      } else void run(reply);
+    }).catch((error) => {
+      if (mounted) { setPhase("error"); setMessage(error.message); }
+    });
+    const pause = () => {
+      if (document.visibilityState !== "hidden") return;
+      const interrupted = pending.current || hintAbort.current;
       pending.current?.abort();
       pending.current = null;
+      hintAbort.current?.abort();
+      hintAbort.current = null;
+      client.stop();
+      if (interrupted) {
+        setHintLoading(false);
+        setPhase("error");
+        setMessage("Engine search paused while this tab was hidden. Please retry.");
+      }
+    };
+    document.addEventListener("visibilitychange", pause);
+    return () => {
+      mounted = false;
+      document.removeEventListener("visibilitychange", pause);
+      pending.current?.abort();
+      pending.current = null;
+      hintAbort.current?.abort();
+      hintAbort.current = null;
+      client.dispose();
+      if (engine.current === client) engine.current = null;
       if (errorTimer.current) clearTimeout(errorTimer.current);
     };
   }, [playerSide, reply, run]);
 
   function onPieceDrop({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string | null }) {
-    if (!targetSquare || pending.current || complete || !playerTurn) return false;
+    if (!targetSquare || busy || unavailable || pending.current || complete || !playerTurn) return false;
     const before = game.current.fen();
     let attempted: string;
     try { attempted = toUci(new Chess(before).move({ from: sourceSquare, to: targetSquare, promotion })); }
     catch { setMessage("That move is not legal in this position."); return false; }
     setShowError(false);
+    hintAbort.current?.abort();
+    setHintLoading(false);
     void run(async (controller) => {
       setPhase("checking");
       setMessage("Checking your move…");
-      const expected = await expectedMoveFor(before, controller.signal);
+      const expected = await expectedForPosition(controller.signal);
       if (controller.signal.aborted) return;
+      setExpectedMove(expected);
       if (attempted !== expected) {
-        // Preserve the first hint even if a later evaluation changes its top move.
+        // Preserve the first conceptual hint for this unchanged position.
         setHint((current) => current ?? classifyHint(before, expected));
         setShowError(true);
         setMessage("Incorrect move. Try the strongest move.");
@@ -89,6 +187,8 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
       }
       applyUci(game.current, attempted);
       setHint(null);
+      setHintStage(0);
+      setExpectedMove(null);
       publish();
       // Validate, commit, then await the NEW position's reply under one lock.
       await reply(controller);
@@ -97,14 +197,91 @@ export default function TrainerBoard({ startingFen, playerSide, boardOrientation
     return false;
   }
 
+  const moveHint = expectedMove ? parseMoveHint(expectedMove) : null;
+  const squareStyles = hintStage >= 1 && moveHint ? {
+    [moveHint.fromSquare]: {
+      backgroundColor: "rgba(245, 158, 11, 0.45)",
+      boxShadow: "inset 0 0 0 3px #f59e0b",
+      borderRadius: "4px",
+    },
+  } : undefined;
+
+  const arrows = hintStage === 2 && moveHint ? [
+    {
+      startSquare: moveHint.fromSquare,
+      endSquare: moveHint.toSquare,
+      color: "rgb(245, 158, 11)",
+    },
+  ] : [];
+
+  const squareRenderer = useCallback(({ square, children }: { square: string; children?: React.ReactNode }) => {
+    const isHighlighted = hintStage >= 1 && moveHint?.fromSquare === square;
+    return (
+      <div
+        data-highlighted={isHighlighted ? "true" : undefined}
+        className={isHighlighted ? "hint-highlighted-square" : undefined}
+        style={{
+          width: "100%",
+          height: "100%",
+          ...(isHighlighted ? {
+            backgroundColor: "rgba(245, 158, 11, 0.45)",
+            boxShadow: "inset 0 0 0 3px #f59e0b",
+            borderRadius: "4px",
+          } : {}),
+        }}
+      >
+        {children}
+      </div>
+    );
+  }, [hintStage, moveHint]);
+
   return <section className="space-y-5">
-    <div className="trainer-bar"><span>Playing {playerSide === "w" ? "White" : "Black"}</span><button className="button-secondary" onClick={onBackToSetup}>Setup</button></div>
-    <div className="board-shell" data-fen={fen}><Chessboard options={{ position: fen, boardOrientation, onPieceDrop, allowDragging: !busy && !complete && playerTurn, boardStyle: { borderRadius: "8px" } }} /><ErrorOverlay visible={showError} />{busy && <div className="board-status">{phase === "checking" ? "Checking move…" : "Engine is thinking…"}</div>}</div>
-    <div className="status-card" aria-live="polite"><span className={busy ? "status-dot loading" : "status-dot"} /><p>{complete ? `Training complete — ${mate ? "checkmate" : "draw"}.` : message}</p></div>
+    <div className="trainer-bar">
+      <span>Playing {playerSide === "w" ? "White" : "Black"}</span>
+      <div className="trainer-actions">
+        <button
+          type="button"
+          className="button-secondary"
+          onClick={() => void handleHint()}
+          disabled={busy || unavailable || complete || !playerTurn || hintLoading}
+          aria-label="Hint"
+          data-hint-stage={hintStage}
+        >
+          {hintLoading ? "Hint…" : "Hint"}
+        </button>
+        <button type="button" className="button-secondary" onClick={onBackToSetup}>Setup</button>
+      </div>
+    </div>
+    <div
+      className="board-shell"
+      data-fen={fen}
+      data-engine-status={engineStatus}
+      data-hint-stage={hintStage}
+      data-hint-piece={hintStage >= 1 && moveHint ? moveHint.fromSquare : undefined}
+      data-hint-move={hintStage >= 2 && expectedMove ? expectedMove : undefined}
+    >
+      <Chessboard
+        options={{
+          id: "trainer-board",
+          position: fen,
+          boardOrientation,
+          onPieceDrop,
+          allowDragging: !busy && !unavailable && !complete && playerTurn,
+          boardStyle: { borderRadius: "8px" },
+          squareStyles,
+          squareRenderer,
+          arrows,
+        }}
+      />
+      <ErrorOverlay visible={showError} />
+      {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : "Engine is thinking…"}</div>}
+    </div>
+    <div className="status-card" aria-live="polite"><span className={busy ? "status-dot loading" : "status-dot"} /><p>{complete ? `Training complete — ${mate ? "checkmate" : "draw"}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : message}</p></div>
     <div role="status" aria-label="Hint" aria-atomic="true">
       {hint && !complete && <p className="hint-card"><strong>Hint</strong> {hintText(hint)}</p>}
     </div>
-    {phase === "error" && !complete && <div className="retry-row"><p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry evaluation." : "Your move was accepted. Retry to play the engine reply."}</p>{!playerTurn && <button className="button-secondary" onClick={() => void run(reply)}>Retry engine reply</button>}</div>}
+    {phase === "error" && !unavailable && !complete && <div className="retry-row"><p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry the engine search." : "Your move was accepted. Retry to play the engine reply."}</p>{!playerTurn && <button className="button-secondary" onClick={() => void run(reply)}>Retry engine reply</button>}</div>}
     <div className="trainer-bar"><span>{plies} half-moves played · {complete ? "Game over" : `${playerTurn ? "Your" : "Engine's"} turn`}</span><label className="promotion-control">Promote to <select aria-label="Promotion piece" value={promotion} disabled={busy} onChange={(event) => setPromotion(event.target.value)}><option value="q">Queen</option><option value="r">Rook</option><option value="b">Bishop</option><option value="n">Knight</option></select></label></div>
+    <p className="setup-note">Stockfish 19 · <a href={`${ENGINE_ASSET_PATH}/COPYING.txt`} target="_blank" rel="noreferrer">GPLv3</a> · <a href={`${ENGINE_ASSET_PATH}/SOURCE.txt`} target="_blank" rel="noreferrer">Source code &amp; notices</a></p>
   </section>;
 }
