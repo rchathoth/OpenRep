@@ -9,7 +9,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
   const errors = [];
   async function makePage(mock = false) {
-    const context = await browser.newContext({ viewport: { width: 1000, height: 1100 } });
+    const context = await browser.newContext({ viewport: { width: 1000, height: 1100 }, hasTouch: true });
     if (mock) await context.addInitScript(() => {
       window.engineMock = { mode: 'ok', calls: [], stops: [], terminated: 0, delay: 250, initDelay: 150 };
       window.Worker = class {
@@ -28,7 +28,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
             const black = message.fen.split(' ')[1] === 'b';
             this.timer = setTimeout(() => {
               if (mode === 'validation-error' || mode === 'reply-error' && black) this.emit({ type: 'error', id: message.id, message: 'Engine search timed out. Please retry.' });
-              else this.emit({ type: 'result', id: message.id, move: mode === 'malformed' ? 'bad' : mode === 'illegal' ? 'e2e5' : mode === 'mate' ? 'g6g7' : mode === 'capture' ? 'a1a2' : mode === 'promotion' ? 'a7a8n' : black ? 'e7e5' : 'e2e4' });
+              else this.emit({ type: 'result', id: message.id, move: mode === 'malformed' ? 'bad' : mode === 'illegal' ? 'e2e5' : mode === 'mate' ? 'g6g7' : mode === 'capture' ? 'a1a2' : mode === 'promotion' ? 'a7a8n' : black ? 'e7e5' : message.fen.includes('4P3') ? 'g1f3' : 'e2e4' });
             }, state.delay);
           }
         }
@@ -44,6 +44,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     const fen = () => page.locator('.board-shell').getAttribute('data-fen');
     const ready = () => page.waitForFunction(() => document.querySelector('[data-engine-status]')?.getAttribute('data-engine-status') === 'ready' && !document.querySelector('.board-status'));
     async function drop(from, to) {
+      await page.locator('.board-shell').scrollIntoViewIfNeeded();
       const a = await page.locator(`[data-square="${from}"]`).boundingBox();
       const b = await page.locator(`[data-square="${to}"]`).boundingBox();
       await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2); await page.mouse.down();
@@ -65,7 +66,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       const occupied = await page.locator('[data-square]:has([data-piece])').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-square')));
       for (const square of occupied) await page.locator(`[data-square="${square}"]`).click({ button: 'right' });
       for (const [piece, square] of pieces) {
-        await page.getByRole('button', { name: `Place ${piece}`, exact: true }).click();
+        await page.getByRole('button', { name: `Place ${piece[0] === 'w' ? 'White' : 'Black'} ${{ K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight', P: 'Pawn' }[piece[1]]}`, exact: true }).click();
         await page.locator(`[data-square="${square}"]`).click();
       }
       await page.getByRole('button', { name: 'Start training' }).click(); await ready();
@@ -115,6 +116,110 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     const mode = value => page.evaluate(value => { window.engineMock.mode = value; }, value);
     const calls = () => page.evaluate(() => window.engineMock.calls);
     const hint = page.getByRole('status', { name: 'Hint' });
+    const tap = square => page.locator(`[data-square="${square}"]`).tap();
+    const tapMove = async (from, to) => { await tap(from); await tap(to); };
+    const selected = () => page.locator('[data-selected="true"]').count();
+    const shot = name => page.screenshot({ path: `/private/tmp/openreps-${name}.png`, fullPage: true });
+    async function layout(width) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.waitForTimeout(350);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Overflow at ${width}`);
+      const board = await page.locator('.board-shell').boundingBox();
+      assert.ok(Math.abs(board.width - board.height) < 2, `Square board at ${width}`);
+      for (const control of await page.locator('button, select').all()) {
+        const box = await control.boundingBox();
+        assert.ok(box.height >= 44, `Touch target height at ${width}`);
+        assert.ok(box.width >= 44, `Touch target width at ${width}`);
+      }
+    }
+
+    await page.goto(base);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Remove pieces', exact: true }).tap();
+    await page.waitForFunction(() => document.querySelector('.remove-toggle').getAttribute('aria-pressed') === 'true');
+    await tap('e1'); await tap('e3');
+
+    assert.equal(await page.locator('[data-square="e1"] [data-piece]').count(), 0);
+    await page.getByRole('button', { name: 'Start training' }).tap();
+    await page.getByRole('alert').getByText('Training positions need exactly one white king and one black king.').waitFor();
+    await page.getByRole('button', { name: 'Place White King', exact: true }).tap();
+    assert.equal(await page.getByRole('button', { name: 'Remove pieces', exact: true }).getAttribute('aria-pressed'), 'false');
+    await tap('e1');
+    await page.locator('[data-square="e1"] [data-piece="wK"]').waitFor();
+    await page.getByLabel('I play').selectOption('b');
+    await page.getByLabel('Side to move').selectOption('b');
+    await page.getByRole('button', { name: 'Remove pieces', exact: true }).tap();
+    await page.getByRole('button', { name: 'Reset position', exact: true }).tap();
+    assert.equal(await page.getByLabel('I play').inputValue(), 'b');
+    assert.equal(await page.getByLabel('Side to move').inputValue(), 'w');
+    assert.equal(await page.getByRole('button', { name: 'Remove pieces', exact: true }).getAttribute('aria-pressed'), 'false');
+    await page.locator('.error-message').waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('[data-square] [data-piece]').count(), 32);
+    const blackBottom = await page.locator('[data-square="e8"]').boundingBox();
+    const whiteTop = await page.locator('[data-square="e1"]').boundingBox();
+    assert.ok(blackBottom.y > whiteTop.y, 'Reset retains Black orientation');
+    for (const width of [1440, 1000, 768, 390, 320]) {
+      await layout(width); await shot(`setup-${width}`);
+    }
+    await page.keyboard.press('Tab');
+    await page.getByRole('button', { name: 'Start training' }).focus();
+    assert.equal(await page.getByRole('button', { name: 'Start training' }).evaluate(button => getComputedStyle(button).outlineStyle), 'solid');
+    console.log('PASS touch editing, validation, reset, orientation and setup layouts');
+
+    await start(); const tapInitial = await fen();
+    await tap('e2'); assert.equal(await selected(), 1);
+    await tap('e2'); assert.equal(await selected(), 0);
+    await tap('e2'); await tap('d2');
+    assert.equal(await page.locator('[data-square="d2"] [data-selected="true"]').count(), 1);
+    await tap('d5');
+    await page.getByText('That move is not legal in this position.', { exact: true }).waitFor();
+    assert.equal(await selected(), 0); assert.equal((await calls()).length, 0);
+    await tapMove('d2', 'd4'); await ready();
+    assert.equal(await fen(), tapInitial); assert.equal(await selected(), 0);
+    assert.match(await hint.textContent(), /Consider your opponent/);
+    await shot('incorrect-hint');
+    await page.getByRole('button', { name: 'Hint', exact: true }).tap();
+    await tap('e2');
+    assert.equal(await page.locator('[data-square="e2"] [data-selected="true"][data-highlighted="true"]').count(), 1);
+    await tap('e2');
+    await mode('reply-error'); await tapMove('e2', 'e4');
+    await page.getByRole('button', { name: 'Retry engine reply' }).waitFor();
+    await shot('retry');
+    await mode('ok'); await page.getByRole('button', { name: 'Retry engine reply' }).tap(); await ready();
+    const tapResult = await fen();
+    await start(); await drop('e2', 'e4'); await ready();
+    assert.equal(await fen(), tapResult, 'Tap and drag have equivalent validated outcomes');
+    for (const width of [1440, 1000, 768, 390, 320]) {
+      await layout(width); await shot(`ready-${width}`);
+    }
+    await start(); await page.evaluate(() => { window.engineMock.delay = 1000; });
+    await page.getByRole('button', { name: 'Hint', exact: true }).tap();
+    await tapMove('e2', 'e4'); assert.equal(await selected(), 0);
+    await ready(); assert.equal(await fen(), tapInitial); assert.equal((await calls()).length, 1);
+    await start(); await page.evaluate(() => { window.engineMock.delay = 3000; });
+    await tapMove('e2', 'e4');
+    assert.equal(await fen(), tapInitial, 'Tap does not commit before validation');
+    await tapMove('d2', 'd4');
+    await shot('thinking'); await ready(); assert.equal(new Chess(await fen()).turn(), 'w');
+    assert.equal((await calls()).length, 2, 'Busy taps do not queue a move');
+    await start('b'); await tapMove('e7', 'e5'); await ready();
+    assert.equal(new Chess(await fen()).turn(), 'b');
+    assert.equal(new Chess(await fen()).get('e5').color, 'b');
+    await start('w', 'validation-error'); await tapMove('e2', 'e4');
+    await page.getByText('Your move was not accepted.', { exact: false }).waitFor();
+    assert.equal(await fen(), tapInitial);
+    await mode('ok'); await tapMove('e2', 'e4'); await ready();
+    await custom([['wK','h1'],['wP','a7'],['bK','h8']], 'promotion');
+    await page.getByLabel('Promotion piece').selectOption('n'); await tapMove('a7', 'a8');
+    await page.getByText('Training complete — draw.', { exact: true }).waitFor();
+    assert.equal(new Chess(await fen()).get('a8').type, 'n');
+    await page.waitForTimeout(350); await shot('complete');
+    await tap('h1'); assert.equal(await selected(), 0);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.equal(await page.locator('.status-dot').evaluate(dot => getComputedStyle(dot).animationName), 'none');
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    console.log('PASS tap input, hints, underpromotion, Black, input locks, retries and training layouts');
+
     await start(); const initial = await fen();
     await drop('e2', 'e5');
     await page.getByText('That move is not legal in this position.', { exact: true }).waitFor();
@@ -220,6 +325,23 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     assert.equal((await calls()).length, 1); assert.equal(new Chess(await fen()).get('a8').type, 'n');
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     console.log('PASS mobile hints, checkmate, capture, draw and underpromotion');
+    await start();
+    await page.locator('.board-shell').scrollIntoViewIfNeeded();
+    const touchFrom = await page.locator('[data-square="e2"]').boundingBox();
+    const touchTo = await page.locator('[data-square="e4"]').boundingBox();
+    const cdp = await context.newCDPSession(page);
+    const point = fraction => ({ x: touchFrom.x + touchFrom.width / 2 + (touchTo.x - touchFrom.x) * fraction, y: touchFrom.y + touchFrom.height / 2 + (touchTo.y - touchFrom.y) * fraction });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(0)] });
+    for (let step = 1; step <= 10; step++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(step / 10)] });
+      await page.waitForTimeout(16);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await ready();
+    assert.equal(await fen(), tapResult, 'Touch drag has the same outcome as mouse drag and taps');
+    assert.equal(await selected(), 0);
+    await cdp.detach();
+    console.log('PASS touch dragging remains compatible with tap input');
     await context.close(); assert.deepEqual(errors, []);
     console.log('PASS no browser errors');
   } finally { await browser.close(); }

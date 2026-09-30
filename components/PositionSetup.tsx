@@ -1,5 +1,7 @@
 "use client";
 
+import { useBoardTap } from "@/components/useBoardTap";
+import { boardAppearance } from "@/components/boardAppearance";
 import { useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard, defaultPieces } from "react-chessboard";
@@ -59,6 +61,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
   const [playerSide, setPlayerSide] = useState<Side>("w");
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
   const [selectedPiece, setSelectedPiece] = useState("wP");
+  const [removing, setRemoving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function onPieceDrop({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string | null }) {
@@ -92,112 +95,86 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
     onStartTraining(fen, playerSide, boardOrientation);
   }
 
+  function removePiece(square: string) {
+    setPosition((current) => {
+      if (!current[square]) return current;
+      const next = { ...current };
+      delete next[square];
+      return next;
+    });
+  }
+
+  const boardTap = useBoardTap(({ square }) => removing ? removePiece(square) :
+    setPosition((current) => ({ ...current, [square]: { pieceType: selectedPiece } })));
+
   return (
-    <section className="space-y-5">
-      <p className="setup-note">
-        Drag pieces to arrange the position. Choose a piece below to add it; right-click to remove.
-      </p>
-      <div className="board-shell">
-        <Chessboard
-          options={{
+    <section className="workspace" aria-labelledby="setup-title">
+      <div className="board-column">
+        <div className="screen-heading">
+          <h2 id="setup-title">Set up a position</h2>
+          <p>Drag pieces to arrange them, or choose a piece and tap a square.</p>
+        </div>
+        <div className="board-shell" {...boardTap.handlers}>
+          <Chessboard options={{
+            ...boardAppearance,
             position,
             boardOrientation,
             onPieceDrop,
-            onSquareClick: ({ square }) =>
-              setPosition((current) => ({ ...current, [square]: { pieceType: selectedPiece } })),
-            onSquareRightClick: ({ square }) =>
-              setPosition((current) => {
-                const next = { ...current };
-                delete next[square];
-                return next;
-              }),
+            onSquareClick: boardTap.onSquareClick,
+            showAnimations: false,
+            onSquareRightClick: ({ square }) => removePiece(square),
             allowDragOffBoard: true,
-            boardStyle: { borderRadius: "12px" },
-          }}
-        />
-      </div>
-      <div className="setup-controls">
-        <div className="piece-palette-wrap">
-          <div className="piece-header">
-            <p className="control-label">Piece to place</p>
-            <span className="piece-active-name">{PIECE_NAMES[selectedPiece]}</span>
-          </div>
-          <div className="piece-palette" role="group" aria-label="Pieces to place">
-            {palette.map((piece) => {
-              const PieceIcon = defaultPieces[piece];
-              return (
-                <button
-                  key={piece}
-                  type="button"
-                  className={selectedPiece === piece ? "piece-choice active" : "piece-choice"}
-                  onClick={() => setSelectedPiece(piece)}
-                  aria-label={`Place ${piece}`}
-                  aria-pressed={selectedPiece === piece}
-                  title={PIECE_NAMES[piece]}
-                >
-                  <span className="piece-svg-wrap">
-                    {PieceIcon ? (
-                      <PieceIcon />
-                    ) : (
-                      <span className={`piece-icon ${piece[0] === "w" ? "white" : "black"}`}>
-                        {piece[1]}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="control-label">
-            I play
-            <select
-              value={playerSide}
-              onChange={(event) => {
-                const next = event.target.value as Side;
-                setPlayerSide(next);
-                setBoardOrientation(next === "w" ? "white" : "black");
-              }}
-              className="select-control"
-            >
-              <option value="w">White</option>
-              <option value="b">Black</option>
-            </select>
-          </label>
-          <label className="control-label">
-            Side to move
-            <select
-              value={side}
-              onChange={(event) => setSide(event.target.value as Side)}
-              className="select-control"
-            >
-              <option value="w">White</option>
-              <option value="b">Black</option>
-            </select>
-          </label>
-          <button
-            className="button-secondary"
-            onClick={() => setBoardOrientation((current) => (current === "white" ? "black" : "white"))}
-          >
-            Flip board
-          </button>
-          <button
-            className="button-secondary"
-            onClick={() => {
-              setPosition(fenToPosition(STANDARD_FEN));
-              setSide("w");
-              setError(null);
-            }}
-          >
-            Reset position
-          </button>
-          <button className="button-primary" onClick={startTraining}>
-            Start training <span aria-hidden>→</span>
-          </button>
+            allowDragging: !removing,
+          }} />
         </div>
       </div>
-      {error && <p className="error-message" role="alert">{error}</p>}
+      <aside className="control-panel" aria-label="Position controls">
+        <div className="panel-section">
+          <h3>Piece to place</h3>
+          <p className="setup-note active-tool" aria-live="polite">{removing ? "Tap a square to remove its piece" : PIECE_NAMES[selectedPiece]}</p>
+          {["w", "b"].map((color) => (
+            <div key={color} className="palette-group" role="group" aria-label={`${color === "w" ? "White" : "Black"} pieces`}>
+              <p className="control-label">{color === "w" ? "White" : "Black"}</p>
+              <div className="piece-palette">
+                {palette.filter((piece) => piece[0] === color).map((piece) => {
+                  const PieceIcon = defaultPieces[piece];
+                  const active = !removing && selectedPiece === piece;
+                  return <button key={piece} type="button" className={`piece-choice${active ? " active" : ""}`}
+                    onClick={() => { setSelectedPiece(piece); setRemoving(false); }}
+                    aria-label={`Place ${PIECE_NAMES[piece]}`} aria-pressed={active} title={PIECE_NAMES[piece]}>
+                    <span className="piece-svg-wrap">{PieceIcon ? <PieceIcon /> : piece[1]}</span>
+                  </button>;
+                })}
+              </div>
+            </div>
+          ))}
+          <button type="button" className="button-secondary remove-toggle" aria-pressed={removing} onClick={() => setRemoving((current) => !current)}>Remove pieces</button>
+          <p className="setup-note">You can also right-click a square to remove a piece.</p>
+        </div>
+        <div className="panel-section side-settings">
+          <label className="control-label">I play
+            <select className="select-control" value={playerSide} onChange={(event) => {
+              const next = event.target.value as Side;
+              setPlayerSide(next); setBoardOrientation(next === "w" ? "white" : "black");
+            }}><option value="w">White</option><option value="b">Black</option></select>
+          </label>
+          <label className="control-label">Side to move
+            <select className="select-control" value={side} onChange={(event) => setSide(event.target.value as Side)}>
+              <option value="w">White</option><option value="b">Black</option>
+            </select>
+          </label>
+        </div>
+        <div className="panel-section board-actions">
+          <button type="button" className="button-secondary" onClick={() => setBoardOrientation((current) => current === "white" ? "black" : "white")}>Flip board</button>
+          <button type="button" className="button-secondary" onClick={() => {
+            setPosition(fenToPosition(STANDARD_FEN)); setSide("w"); setError(null); setRemoving(false);
+          }}>Reset position</button>
+        </div>
+        <div className="start-actions">
+          {error && <p className="error-message" role="alert">{error}</p>}
+          <button type="button" className="button-primary" onClick={startTraining}>Start training <span aria-hidden="true">→</span></button>
+        </div>
+      </aside>
     </section>
   );
 }

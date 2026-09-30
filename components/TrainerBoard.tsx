@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
+import { useBoardTap } from "@/components/useBoardTap";
+import { boardAppearance } from "@/components/boardAppearance";
 import ErrorOverlay from "@/components/ErrorOverlay";
 import { applyUci, getExpectedMove, toUci } from "@/lib/training";
 import { EngineClient } from "@/lib/engine/engine-client";
@@ -23,7 +25,9 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const game = useRef(new Chess(startingFen));
   const [snapshot, setSnapshot] = useState(() => ({ fen: startingFen, complete: new Chess(startingFen).isGameOver(), mate: new Chess(startingFen).isCheckmate(), plies: 0 }));
   const { fen, complete, mate, plies } = snapshot;
+  const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const publish = useCallback(() => {
+    setSelectedSquare(null);
     setSnapshot({ fen: game.current.fen(), complete: game.current.isGameOver(), mate: game.current.isCheckmate(), plies: game.current.history().length });
   }, []);
   const engine = useRef<EngineClient | null>(null);
@@ -161,7 +165,8 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     };
   }, [playerSide, reply, run]);
 
-  function onPieceDrop({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string | null }) {
+  function attemptMove(sourceSquare: string, targetSquare: string | null) {
+    setSelectedSquare(null);
     if (!targetSquare || busy || unavailable || pending.current || complete || !playerTurn) return false;
     const before = game.current.fen();
     let attempted: string;
@@ -197,15 +202,21 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     return false;
   }
 
-  const moveHint = expectedMove ? parseMoveHint(expectedMove) : null;
-  const squareStyles = hintStage >= 1 && moveHint ? {
-    [moveHint.fromSquare]: {
-      backgroundColor: "rgba(245, 158, 11, 0.45)",
-      boxShadow: "inset 0 0 0 3px #f59e0b",
-      borderRadius: "4px",
-    },
-  } : undefined;
+  function onPieceDrop({ sourceSquare, targetSquare }: { sourceSquare: string; targetSquare: string | null }) {
+    return attemptMove(sourceSquare, targetSquare);
+  }
 
+  function onSquareClick({ square }: { square: string }) {
+    if (busy || unavailable || pending.current || complete || !playerTurn || hintLoading || hintAbort.current) return;
+    if (square === selectedSquare) { setSelectedSquare(null); return; }
+    const piece = game.current.get(square as Parameters<Chess["get"]>[0]);
+    if (piece?.color === playerSide) { setSelectedSquare(square); return; }
+    if (selectedSquare) attemptMove(selectedSquare, square);
+  }
+
+  const boardTap = useBoardTap(onSquareClick);
+
+  const moveHint = expectedMove ? parseMoveHint(expectedMove) : null;
   const arrows = hintStage === 2 && moveHint ? [
     {
       startSquare: moveHint.fromSquare,
@@ -215,14 +226,18 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   ] : [];
 
   const squareRenderer = useCallback(({ square, children }: { square: string; children?: React.ReactNode }) => {
+    const isSelected = selectedSquare === square;
     const isHighlighted = hintStage >= 1 && moveHint?.fromSquare === square;
     return (
       <div
+        data-selected={isSelected ? "true" : undefined}
         data-highlighted={isHighlighted ? "true" : undefined}
         className={isHighlighted ? "hint-highlighted-square" : undefined}
         style={{
           width: "100%",
           height: "100%",
+          outline: isSelected ? "3px solid var(--accent)" : undefined,
+          outlineOffset: "-6px",
           ...(isHighlighted ? {
             backgroundColor: "rgba(245, 158, 11, 0.45)",
             boxShadow: "inset 0 0 0 3px #f59e0b",
@@ -233,55 +248,73 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
         {children}
       </div>
     );
-  }, [hintStage, moveHint]);
+  }, [hintStage, moveHint, selectedSquare]);
 
-  return <section className="space-y-5">
-    <div className="trainer-bar">
-      <span>Playing {playerSide === "w" ? "White" : "Black"}</span>
-      <div className="trainer-actions">
-        <button
-          type="button"
-          className="button-secondary"
-          onClick={() => void handleHint()}
-          disabled={busy || unavailable || complete || !playerTurn || hintLoading}
-          aria-label="Hint"
-          data-hint-stage={hintStage}
-        >
-          {hintLoading ? "Hint…" : "Hint"}
-        </button>
-        <button type="button" className="button-secondary" onClick={onBackToSetup}>Setup</button>
+  const statusKind = complete ? "complete" : unavailable || phase === "error" ? "error" : engineStatus === "starting" ? "starting" : hintLoading ? "thinking" : phase === "checking" ? "checking" : phase === "replying" ? "replying" : message.startsWith("Incorrect") || message.startsWith("That move") ? "incorrect" : "ready";
+  const statusTitle = { complete: "Session complete", error: "Needs attention", starting: "Starting engine", thinking: "Finding a hint", checking: "Checking your move", replying: "Engine’s turn", incorrect: "Try again", ready: "Your turn" }[statusKind];
+
+  return <section className="workspace" aria-labelledby="training-title">
+    <div className="board-column">
+      <div className="screen-heading">
+        <h2 id="training-title">Find the strongest move</h2>
+        <p>Drag a piece, or tap it and then its destination.</p>
       </div>
-    </div>
-    <div
-      className="board-shell"
-      data-fen={fen}
-      data-engine-status={engineStatus}
-      data-hint-stage={hintStage}
-      data-hint-piece={hintStage >= 1 && moveHint ? moveHint.fromSquare : undefined}
-      data-hint-move={hintStage >= 2 && expectedMove ? expectedMove : undefined}
-    >
-      <Chessboard
-        options={{
+      <div className="board-shell" {...boardTap.handlers}
+        data-fen={fen}
+        data-engine-status={engineStatus}
+        data-hint-stage={hintStage}
+        data-hint-piece={hintStage >= 1 && moveHint ? moveHint.fromSquare : undefined}
+        data-hint-move={hintStage >= 2 && expectedMove ? expectedMove : undefined}
+      >
+        <Chessboard options={{
+          ...boardAppearance,
           id: "trainer-board",
           position: fen,
           boardOrientation,
           onPieceDrop,
+          onSquareClick: boardTap.onSquareClick,
+          onPieceDrag: () => setSelectedSquare(null),
           allowDragging: !busy && !unavailable && !complete && playerTurn,
-          boardStyle: { borderRadius: "8px" },
-          squareStyles,
           squareRenderer,
           arrows,
-        }}
-      />
-      <ErrorOverlay visible={showError} />
-      {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : "Engine is thinking…"}</div>}
+        }} />
+        <ErrorOverlay visible={showError} />
+        {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : phase === "checking" ? "Checking your move…" : "Engine is thinking…"}</div>}
+      </div>
     </div>
-    <div className="status-card" aria-live="polite"><span className={busy ? "status-dot loading" : "status-dot"} /><p>{complete ? `Training complete — ${mate ? "checkmate" : "draw"}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : message}</p></div>
-    <div role="status" aria-label="Hint" aria-atomic="true">
-      {hint && !complete && <p className="hint-card"><strong>Hint</strong> {hintText(hint)}</p>}
-    </div>
-    {phase === "error" && !unavailable && !complete && <div className="retry-row"><p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry the engine search." : "Your move was accepted. Retry to play the engine reply."}</p>{!playerTurn && <button className="button-secondary" onClick={() => void run(reply)}>Retry engine reply</button>}</div>}
-    <div className="trainer-bar"><span>{plies} half-moves played · {complete ? "Game over" : `${playerTurn ? "Your" : "Engine's"} turn`}</span><label className="promotion-control">Promote to <select aria-label="Promotion piece" value={promotion} disabled={busy} onChange={(event) => setPromotion(event.target.value)}><option value="q">Queen</option><option value="r">Rook</option><option value="b">Bishop</option><option value="n">Knight</option></select></label></div>
-    <p className="setup-note">Stockfish 19 · <a href={`${ENGINE_ASSET_PATH}/COPYING.txt`} target="_blank" rel="noreferrer">GPLv3</a> · <a href={`${ENGINE_ASSET_PATH}/SOURCE.txt`} target="_blank" rel="noreferrer">Source code &amp; notices</a></p>
+    <aside className="control-panel training-panel" aria-label="Training controls">
+      <div className="session-summary">
+        <span className="side-badge">Playing {playerSide === "w" ? "White" : "Black"}</span>
+        <p className="setup-note">{plies} half-moves played · {complete ? "Game over" : `${playerTurn ? "Your" : "Engine's"} turn`}</p>
+      </div>
+      <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
+        <h3><span className={busy || hintLoading ? "status-dot loading" : "status-dot"} />{statusTitle}</h3>
+        <p>{complete ? `Training complete — ${mate ? "checkmate" : "draw"}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
+        {phase === "error" && !unavailable && !complete && <div className="retry-row">
+          <p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry the engine search." : "Your move was accepted. Retry to play the engine reply."}</p>
+          {!playerTurn && <button type="button" className="button-secondary" onClick={() => void run(reply)}>Retry engine reply</button>}
+        </div>}
+      </div>
+      <div className="panel-section">
+        <div className="hint-controls">
+          <button type="button" className="button-secondary" onClick={() => void handleHint()}
+            disabled={busy || unavailable || complete || !playerTurn || hintLoading}
+            aria-label="Hint" data-hint-stage={hintStage}>{hintLoading ? "Hint…" : "Hint"}</button>
+          <span className="setup-note">{["No visual hint", "Piece highlighted", "Move shown"][hintStage]}</span>
+        </div>
+        <div role="status" aria-label="Hint" aria-atomic="true">
+          {hint && !complete && <p className="hint-card"><strong>Hint</strong> {hintText(hint)}</p>}
+        </div>
+      </div>
+      <div className="panel-section">
+        <label className="control-label promotion-control">Promote to
+          <select className="select-control" aria-label="Promotion piece" value={promotion} disabled={busy} onChange={(event) => setPromotion(event.target.value)}>
+            <option value="q">Queen</option><option value="r">Rook</option><option value="b">Bishop</option><option value="n">Knight</option>
+          </select>
+        </label>
+      </div>
+      <button type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}>Setup</button>
+      <p className="engine-footer">Stockfish 19 · <a href={`${ENGINE_ASSET_PATH}/COPYING.txt`} target="_blank" rel="noreferrer">GPLv3</a> · <a href={`${ENGINE_ASSET_PATH}/SOURCE.txt`} target="_blank" rel="noreferrer">Source code &amp; notices</a></p>
+    </aside>
   </section>;
 }

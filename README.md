@@ -11,7 +11,9 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. Arrange a position, choose your side, and start training. The untouched standard position retains castling rights. Custom arrangements start without castling or en-passant rights. Choose the promotion piece before moving a pawn to the last rank.
+Open http://localhost:3000. Arrange a position, choose your side, and start training. The board and controls sit side by side on desktop and stack on smaller screens. Choose a piece and tap a square to place it; toggle **Remove pieces** to erase pieces on touch devices. Reset restores the standard position and White to move while retaining your playing side and board orientation. The untouched standard position retains castling rights. Custom arrangements start without castling or en-passant rights. Choose the promotion piece before moving a pawn to the last rank.
+
+During training, drag a piece or tap your piece and then its destination. Tap the selected piece again to cancel, or another friendly piece to switch selection. Taps and drops use the same engine validation, including the selected promotion piece. Visual hints remain amber; tap selection has a green outline.
 
 A legal attempt is compared to Stockfish's exact best move from the **pre-move** position. Incorrect moves snap back with a red X. A correct move is committed only after engine validation, then Stockfish searches the **new** position and plays its reply. Starting as Black triggers the engine's opening move. The session ends at checkmate, a draw, or returning to setup.
 
