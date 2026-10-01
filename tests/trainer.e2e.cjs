@@ -10,8 +10,9 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
   const errors = [];
   async function makePage(mock = false) {
     const context = await browser.newContext({ viewport: { width: 1000, height: 1100 }, hasTouch: true });
+    await context.addInitScript(() => { window.openingMock = { moves: [], replyMoves: [], calls: [] }; });
     if (mock) await context.addInitScript(() => {
-      window.engineMock = { mode: 'ok', calls: [], stops: [], terminated: 0, delay: 250, initDelay: 150 };
+      window.engineMock = { mode: 'ok', calls: [], stops: [], terminated: 0, delay: 250, initDelay: 150, script: [] };
       window.Worker = class {
         postMessage(message) {
           const state = window.engineMock;
@@ -28,7 +29,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
             const black = message.fen.split(' ')[1] === 'b';
             this.timer = setTimeout(() => {
               if (mode === 'validation-error' || mode === 'reply-error' && black) this.emit({ type: 'error', id: message.id, message: 'Engine search timed out. Please retry.' });
-              else this.emit({ type: 'result', id: message.id, move: mode === 'malformed' ? 'bad' : mode === 'illegal' ? 'e2e5' : mode === 'mate' ? 'g6g7' : mode === 'capture' ? 'a1a2' : mode === 'promotion' ? 'a7a8n' : black ? 'e7e5' : message.fen.includes('4P3') ? 'g1f3' : 'e2e4' });
+              else this.emit({ type: 'result', id: message.id, move: mode === 'scripted' ? state.script.shift() : mode === 'malformed' ? 'bad' : mode === 'illegal' ? 'e2e5' : mode === 'mate' ? 'g6g7' : mode === 'capture' ? 'a1a2' : mode === 'promotion' ? 'a7a8n' : black ? 'e7e5' : message.fen.includes('4P3') ? 'g1f3' : 'e2e4' });
             }, state.delay);
           }
         }
@@ -37,6 +38,15 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       };
     });
     const page = await context.newPage();
+    await context.route('**/api/opening', async route => {
+      const fen = route.request().postDataJSON()?.fen;
+      const data = await page.evaluate(fen => {
+        window.openingMock.calls.push(fen);
+        const uci = window.openingMock.replyMoves.shift();
+        return { moves: uci ? [typeof uci === 'string' ? { uci, count: 10 } : uci] : window.openingMock.moves };
+      }, fen);
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+    });
     page.on('pageerror', error => { errors.push(error.message); console.error('Browser error:', error.message); });
     return { context, page };
   }
@@ -53,9 +63,10 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       // detach before clicking toolbar buttons (the engine is still thinking).
       await page.waitForTimeout(75);
     }
-    async function start(side = 'w', mode = 'ok', wait = true) {
+    async function start(side = 'w', mode = 'ok', wait = true, openingMoves = [], playerMoves = []) {
       await page.goto(base);
       await page.evaluate(mode => { if (window.engineMock) window.engineMock.mode = mode; }, mode);
+      await page.evaluate(({ moves, playerMoves }) => { window.openingMock.moves = moves; window.openingMock.replyMoves = [...moves]; if (window.engineMock) window.engineMock.script = playerMoves; }, { moves: openingMoves, playerMoves });
       if (side === 'b') await page.getByLabel('I play').selectOption('b');
       await page.getByRole('button', { name: 'Start training' }).click();
       if (wait) await ready();
@@ -74,7 +85,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     return { fen, ready, drop, start, custom };
   }
   try {
-    // Real WASM and real nested workers, with networking disabled after startup.
+    // Real WASM and real nested workers, with only opponent lookups permitted.
     const live = await makePage();
     verifyDemo(await demonstrateEngine(live.page));
     console.log('PASS real worker stop, reuse, and main-thread responsiveness');
@@ -96,10 +107,10 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       assert.match(move, /^[a-h][1-8][a-h][1-8][qrbn]?$/);
       const copy = new Chess(before); copy.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: move[4] });
       await h.drop(move.slice(0, 2), move.slice(2, 4));
-      await live.page.getByText(`${(turn + 1) * 2} half-moves played`, { exact: false }).waitFor(); await h.ready();
+      await live.page.getByText(`${(turn + 1) * 2} / 20 half-moves practiced`, { exact: false }).waitFor(); await h.ready();
       assert.equal(new Chess(await h.fen()).turn(), 'w');
     }
-    assert.deepEqual(actions, [], 'Training must not make network requests');
+    assert.ok(actions.every(url => url.includes('/api/opening')), 'Only opponent opening lookups may make network requests');
     await live.page.waitForTimeout(350);
     await live.page.screenshot({ path: '/private/tmp/openreps-desktop.png', fullPage: true });
     await live.context.setOffline(false);
@@ -120,13 +131,55 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     const tapMove = async (from, to) => { await tap(from); await tap(to); };
     const selected = () => page.locator('[data-selected="true"]').count();
     const shot = name => page.screenshot({ path: `/private/tmp/openreps-${name}.png`, fullPage: true });
+    await start('b', 'ok', true, [{ uci: 'e2e4', count: 25 }]);
+    await page.waitForFunction(() => document.querySelector('.board-shell')?.getAttribute('data-fen')?.includes('4P3'));
+    assert.equal((await calls()).length, 0, 'Starting as Black should use the database opening move without a search');
+    await page.evaluate(() => { window.openingMock.moves = []; });
+    await start();
+    await page.evaluate(() => { window.openingMock.moves = [{ uci: 'c7c5', count: 25 }]; });
+    await drop('e2', 'e4'); await ready();
+    assert.match(await fen(), /2p5/); assert.equal((await calls()).length, 1, 'A database reply should not start an opponent search');
+    assert.equal((await page.evaluate(() => window.openingMock.calls)).length, 1);
+    await page.evaluate(() => { window.openingMock.moves = []; });
+    console.log('PASS Lichess replies, distinct from Stockfish, and database opening when playing Black');
+    const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8','g2g3','g7g5','c3b5','b8c6','b5a7','d8d7','f3d4','f6f5','a2a4','h7h5'];
+    async function reachDepth(side) {
+      const playerMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 0 : 1));
+      const replyMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 1 : 0));
+      await start(side, 'scripted', true, replyMoves, playerMoves);
+      for (let turn = 0; turn < 10; turn++) {
+        const uci = playerMoves[turn];
+        await drop(uci.slice(0, 2), uci.slice(2, 4));
+        await ready();
+      }
+      await page.getByRole('dialog', { name: 'Good depth reached' }).waitFor();
+      assert.equal(await page.locator('.session-summary').textContent().then(text => text.includes('20 / 20 half-moves practiced')), true);
+      assert.equal((await calls()).length, 10);
+      return { requestCount: (await page.evaluate(() => window.openingMock.calls)).length, fen: await fen() };
+    }
+    const depthWhite = await reachDepth('w');
+    const completionDialog = page.getByRole('dialog', { name: 'Good depth reached' });
+    await completionDialog.getByRole('button', { name: 'Practice different lines' }).focus();
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Practice different lines');
+    await page.keyboard.press('Escape'); await completionDialog.waitFor({ state: 'hidden' });
+    assert.equal(await page.getByRole('button', { name: 'Setup', exact: true }).evaluate(button => document.activeElement === button), true);
+    assert.equal(await page.getByRole('button', { name: 'Hint', exact: true }).isDisabled(), true);
+    assert.equal(await fen(), depthWhite.fen);
+    await page.getByRole('button', { name: 'Setup', exact: true }).click();
+    await page.getByRole('button', { name: 'Start training' }).waitFor();
+    const depthBlack = await reachDepth('b');
+    assert.equal(depthBlack.requestCount, 10, 'The final player move must not request another opponent reply');
+    await page.getByRole('dialog', { name: 'Good depth reached' }).getByRole('button', { name: 'Practice different lines' }).click();
+    await page.getByRole('button', { name: 'Start training' }).waitFor();
+    console.log('PASS 20-ply cap, completion dialog, keyboard dismissal, locked review, and return to setup');
     async function layout(width) {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(350);
+      await page.locator('.board-shell').waitFor({ state: 'visible' });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Overflow at ${width}`);
       const board = await page.locator('.board-shell').boundingBox();
       assert.ok(Math.abs(board.width - board.height) < 2, `Square board at ${width}`);
-      for (const control of await page.locator('button, select').all()) {
+      for (const control of await page.locator('button:visible, select:visible').all()) {
         const box = await control.boundingBox();
         assert.ok(box.height >= 44, `Touch target height at ${width}`);
         assert.ok(box.width >= 44, `Touch target width at ${width}`);
@@ -183,9 +236,9 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     assert.equal(await page.locator('[data-square="e2"] [data-selected="true"][data-highlighted="true"]').count(), 1);
     await tap('e2');
     await mode('reply-error'); await tapMove('e2', 'e4');
-    await page.getByRole('button', { name: 'Retry engine reply' }).waitFor();
+    await page.getByRole('button', { name: 'Retry opponent reply' }).waitFor();
     await shot('retry');
-    await mode('ok'); await page.getByRole('button', { name: 'Retry engine reply' }).tap(); await ready();
+    await mode('ok'); await page.getByRole('button', { name: 'Retry opponent reply' }).tap(); await ready();
     const tapResult = await fen();
     await start(); await drop('e2', 'e4'); await ready();
     assert.equal(await fen(), tapResult, 'Tap and drag have equivalent validated outcomes');
@@ -243,10 +296,10 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     await page.getByRole('button', { name: 'Hint', exact: true }).click();
     assert.equal(await page.locator('.board-shell').getAttribute('data-hint-stage'), '0');
     await mode('reply-error'); await drop('e2', 'e4'); await drop('d2', 'd4');
-    await page.getByRole('button', { name: 'Retry engine reply' }).waitFor();
+    await page.getByRole('button', { name: 'Retry opponent reply' }).waitFor();
     assert.equal(new Chess(await fen()).turn(), 'b'); assert.equal((await calls()).length, count + 1);
     assert.equal(await hint.textContent(), '');
-    await mode('ok'); await page.getByRole('button', { name: 'Retry engine reply' }).click(); await ready();
+    await mode('ok'); await page.getByRole('button', { name: 'Retry opponent reply' }).click(); await ready();
     assert.equal(new Chess(await fen()).turn(), 'w'); assert.equal((await calls()).length, count + 2);
     console.log('PASS illegal/incorrect moves, engine errors, stable hints, exact cached bestmove, input lock and reply retry');
 
@@ -293,13 +346,13 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await page.getByRole('button', { name: 'Retry engine reply' }).waitFor();
+    await page.getByRole('button', { name: 'Retry opponent reply' }).waitFor();
     assert.equal((await calls()).length, 0);
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    await page.getByRole('button', { name: 'Retry engine reply' }).click(); await ready();
+    await page.getByRole('button', { name: 'Retry opponent reply' }).click(); await ready();
     assert.equal(new Chess(await fen()).turn(), 'b');
     console.log('PASS hiding during initialization defers the automatic opening move');
 

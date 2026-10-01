@@ -7,6 +7,9 @@ import { useBoardTap } from "@/components/useBoardTap";
 import { boardAppearance } from "@/components/boardAppearance";
 import ErrorOverlay from "@/components/ErrorOverlay";
 import { applyUci, getExpectedMove, toUci } from "@/lib/training";
+import { getOpponentMove } from "@/lib/opponent";
+import { getCompletionReason, MAX_TRAINING_PLIES } from "@/lib/session";
+import TrainingCompleteDialog from "@/components/TrainingCompleteDialog";
 import { EngineClient } from "@/lib/engine/engine-client";
 import type { EngineStatus } from "@/lib/engine/types";
 import { ENGINE_ASSET_PATH } from "@/lib/engine/settings";
@@ -23,13 +26,14 @@ export default function TrainerBoard(props: TrainerBoardProps) {
 function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSetup }: TrainerBoardProps) {
   // Preserve move history so repetition and other game-over rules still work.
   const game = useRef(new Chess(startingFen));
-  const [snapshot, setSnapshot] = useState(() => ({ fen: startingFen, complete: new Chess(startingFen).isGameOver(), mate: new Chess(startingFen).isCheckmate(), plies: 0 }));
-  const { fen, complete, mate, plies } = snapshot;
+  const [snapshot, setSnapshot] = useState(() => {
+    const initial = new Chess(startingFen);
+    return { fen: startingFen, completionReason: getCompletionReason(initial), plies: 0 };
+  });
+  const { fen, completionReason, plies } = snapshot;
+  const complete = completionReason !== null;
+  const initiallyDepthComplete = completionReason === "depth-limit";
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
-  const publish = useCallback(() => {
-    setSelectedSquare(null);
-    setSnapshot({ fen: game.current.fen(), complete: game.current.isGameOver(), mate: game.current.isCheckmate(), plies: game.current.history().length });
-  }, []);
   const engine = useRef<EngineClient | null>(null);
   const [engineStatus, setEngineStatus] = useState<EngineStatus>("starting");
   const expectedCache = useRef<{ fen: string; move: string } | null>(null);
@@ -41,9 +45,29 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const [hintLoading, setHintLoading] = useState(false);
   const [promotion, setPromotion] = useState("q");
   const [message, setMessage] = useState("Find the engine's best move.");
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(initiallyDepthComplete);
+  const completionDialogShown = useRef(initiallyDepthComplete);
+  const setupButton = useRef<HTMLButtonElement>(null);
   const pending = useRef<AbortController | null>(null);
   const hintAbort = useRef<AbortController | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const publish = useCallback(() => {
+    setSelectedSquare(null);
+    const reason = getCompletionReason(game.current);
+    setSnapshot({ fen: game.current.fen(), completionReason: reason, plies: game.current.history().length });
+    if (reason) {
+      setPhase("ready");
+      setHint(null);
+      setHintStage(0);
+      setExpectedMove(null);
+      pending.current?.abort();
+      engine.current?.stop();
+      if (reason === "depth-limit" && !completionDialogShown.current) {
+        completionDialogShown.current = true;
+        setCompletionDialogOpen(true);
+      }
+    }
+  }, []);
   const busy = engineStatus === "starting" || phase === "checking" || phase === "replying";
   const unavailable = engineStatus === "unavailable";
   const playerTurn = new Chess(fen).turn() === playerSide;
@@ -59,17 +83,21 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   }, []);
 
   const reply = useCallback(async (controller: AbortController) => {
-    if (game.current.isGameOver()) return;
+    if (controller.signal.aborted || getCompletionReason(game.current)) return;
+    const before = game.current.fen();
     setPhase("replying");
-    setMessage("The engine is choosing its best reply…");
-    const move = await expectedForPosition(controller.signal);
-    if (controller.signal.aborted) return;
+    setMessage("Choosing an opponent reply…");
+    const moveEngine = engine.current;
+    if (!moveEngine) throw new Error("Engine unavailable; reload to retry.");
+    const result = await getOpponentMove(game.current, controller.signal, moveEngine);
+    if (controller.signal.aborted || game.current.fen() !== before || getCompletionReason(game.current)) return;
+    const move = result.move;
     applyUci(game.current, move);
     setHintStage(0);
     setExpectedMove(null);
     publish();
-    setMessage("Your turn — find the engine's best move.");
-  }, [publish, expectedForPosition]);
+    setMessage("Your turn — find the strongest move.");
+  }, [publish]);
 
   const run = useCallback(async (action: (controller: AbortController) => Promise<void>) => {
     if (pending.current) return;
@@ -79,7 +107,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       await action(controller);
       if (!controller.signal.aborted) setPhase("ready");
     } catch (error) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && !getCompletionReason(game.current)) {
         setPhase("error");
         setMessage(error instanceof Error ? error.message : "Engine search failed. Please retry.");
       }
@@ -89,7 +117,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   }, []);
 
   const handleHint = useCallback(async () => {
-    if (busy || unavailable || complete || !playerTurn || hintLoading || hintAbort.current || pending.current) return;
+    if (busy || unavailable || getCompletionReason(game.current) || !playerTurn || hintLoading || hintAbort.current || pending.current) return;
     if (hintStage === 1) {
       setHintStage(2);
       return;
@@ -121,7 +149,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
         setHintLoading(false);
       }
     }
-  }, [busy, unavailable, complete, playerTurn, hintLoading, hintStage, expectedMove, expectedForPosition]);
+  }, [busy, unavailable, playerTurn, hintLoading, hintStage, expectedMove, expectedForPosition]);
 
   useEffect(() => {
     let mounted = true;
@@ -129,7 +157,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     engine.current = client;
     // Covers starting as Black or from any opponent-to-move position.
     void client.initialize().then(() => {
-      if (!mounted || game.current.turn() === playerSide || game.current.isGameOver()) return;
+      if (!mounted || game.current.turn() === playerSide || getCompletionReason(game.current)) return;
       if (document.visibilityState === "hidden") {
         setPhase("error");
         setMessage("Engine search paused while this tab was hidden. Please retry.");
@@ -145,7 +173,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       hintAbort.current?.abort();
       hintAbort.current = null;
       client.stop();
-      if (interrupted) {
+      if (interrupted && !getCompletionReason(game.current)) {
         setHintLoading(false);
         setPhase("error");
         setMessage("Engine search paused while this tab was hidden. Please retry.");
@@ -167,7 +195,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
 
   function attemptMove(sourceSquare: string, targetSquare: string | null) {
     setSelectedSquare(null);
-    if (!targetSquare || busy || unavailable || pending.current || complete || !playerTurn) return false;
+    if (!targetSquare || busy || unavailable || pending.current || getCompletionReason(game.current) || !playerTurn) return false;
     const before = game.current.fen();
     let attempted: string;
     try { attempted = toUci(new Chess(before).move({ from: sourceSquare, to: targetSquare, promotion })); }
@@ -195,6 +223,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       setHintStage(0);
       setExpectedMove(null);
       publish();
+      if (getCompletionReason(game.current)) return;
       // Validate, commit, then await the NEW position's reply under one lock.
       await reply(controller);
     });
@@ -251,7 +280,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   }, [hintStage, moveHint, selectedSquare]);
 
   const statusKind = complete ? "complete" : unavailable || phase === "error" ? "error" : engineStatus === "starting" ? "starting" : hintLoading ? "thinking" : phase === "checking" ? "checking" : phase === "replying" ? "replying" : message.startsWith("Incorrect") || message.startsWith("That move") ? "incorrect" : "ready";
-  const statusTitle = { complete: "Session complete", error: "Needs attention", starting: "Starting engine", thinking: "Finding a hint", checking: "Checking your move", replying: "Engine’s turn", incorrect: "Try again", ready: "Your turn" }[statusKind];
+  const statusTitle = { complete: completionReason === "depth-limit" ? "Practice depth reached" : "Session complete", error: "Needs attention", starting: "Starting engine", thinking: "Finding a hint", checking: "Checking your move", replying: "Opponent’s turn", incorrect: "Try again", ready: "Your turn" }[statusKind];
 
   return <section className="workspace" aria-labelledby="training-title">
     <div className="board-column">
@@ -279,20 +308,20 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           arrows,
         }} />
         <ErrorOverlay visible={showError} />
-        {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : phase === "checking" ? "Checking your move…" : "Engine is thinking…"}</div>}
+        {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : phase === "checking" ? "Checking your move…" : "Choosing an opponent reply…"}</div>}
       </div>
     </div>
     <aside className="control-panel training-panel" aria-label="Training controls">
       <div className="session-summary">
         <span className="side-badge">Playing {playerSide === "w" ? "White" : "Black"}</span>
-        <p className="setup-note">{plies} half-moves played · {complete ? "Game over" : `${playerTurn ? "Your" : "Engine's"} turn`}</p>
+        <p className="setup-note">{plies} / {MAX_TRAINING_PLIES} half-moves practiced · {complete ? (completionReason === "depth-limit" ? "Practice depth reached" : completionReason) : `${playerTurn ? "Your" : "Opponent's"} turn`}</p>
       </div>
       <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
         <h3><span className={busy || hintLoading ? "status-dot loading" : "status-dot"} />{statusTitle}</h3>
-        <p>{complete ? `Training complete — ${mate ? "checkmate" : "draw"}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
+        <p>{complete ? completionReason === "depth-limit" ? "Practice depth reached — 10 moves practiced." : `Training complete — ${completionReason}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
         {phase === "error" && !unavailable && !complete && <div className="retry-row">
           <p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry the engine search." : "Your move was accepted. Retry to play the engine reply."}</p>
-          {!playerTurn && <button type="button" className="button-secondary" onClick={() => void run(reply)}>Retry engine reply</button>}
+          {!playerTurn && <button type="button" className="button-secondary" onClick={() => void run(reply)}>Retry opponent reply</button>}
         </div>}
       </div>
       <div className="panel-section">
@@ -308,13 +337,15 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       </div>
       <div className="panel-section">
         <label className="control-label promotion-control">Promote to
-          <select className="select-control" aria-label="Promotion piece" value={promotion} disabled={busy} onChange={(event) => setPromotion(event.target.value)}>
+          <select className="select-control" aria-label="Promotion piece" value={promotion} disabled={busy || complete} onChange={(event) => setPromotion(event.target.value)}>
             <option value="q">Queen</option><option value="r">Rook</option><option value="b">Bishop</option><option value="n">Knight</option>
           </select>
         </label>
       </div>
-      <button type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}>Setup</button>
+      <button ref={setupButton} type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}>Setup</button>
       <p className="engine-footer">Stockfish 19 · <a href={`${ENGINE_ASSET_PATH}/COPYING.txt`} target="_blank" rel="noreferrer">GPLv3</a> · <a href={`${ENGINE_ASSET_PATH}/SOURCE.txt`} target="_blank" rel="noreferrer">Source code &amp; notices</a></p>
     </aside>
+    <TrainingCompleteDialog open={completionDialogOpen} onPracticeDifferentLines={onBackToSetup}
+      onReview={() => setCompletionDialogOpen(false)} returnFocusRef={setupButton} />
   </section>;
 }
