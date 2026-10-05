@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OpenReps — Chess repertoire trainer",
+  title: "OpenRep — Chess repertoire trainer",
   description: "Practice the strongest chess moves from any position.",
 };
 
