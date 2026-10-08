@@ -473,6 +473,28 @@ button:active:not(:disabled) {
   box-shadow: 0 2px 12px #20282012;
 }
 
+.success-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: error-pop .9s ease-out forwards;
+}
+
+.success-overlay span {
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  color: #06af39;
+  background: #bef1cbd9;
+  font: 700 64px/1 Arial;
+  box-shadow: 0 2px 12px #20282012;
+}
+
 .hint-highlighted-square {
   transition: background-color .2s, box-shadow .2s;
 }

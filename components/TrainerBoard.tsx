@@ -6,6 +6,7 @@ import { Chessboard } from "react-chessboard";
 import { useBoardTap } from "@/components/useBoardTap";
 import { boardAppearance } from "@/components/boardAppearance";
 import ErrorOverlay from "@/components/ErrorOverlay";
+import SuccessOverlay from "@/components/SuccessOverlay";
 import { applyUci, getExpectedMove, toUci } from "@/lib/training";
 import { getOpponentMove } from "@/lib/opponent";
 import { getCompletionReason, MAX_TRAINING_PLIES } from "@/lib/session";
@@ -38,6 +39,8 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const [engineStatus, setEngineStatus] = useState<EngineStatus>("starting");
   const expectedCache = useRef<{ fen: string; move: string } | null>(null);
   const [phase, setPhase] = useState<Phase>("ready");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showError, setShowError] = useState(false);
   const [hint, setHint] = useState<HintClassification | null>(null);
   const [hintStage, setHintStage] = useState<HintStage>(0);
@@ -187,6 +190,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       pending.current = null;
       hintAbort.current?.abort();
       hintAbort.current = null;
+      if (successTimer.current) clearTimeout(successTimer.current);
       client.dispose();
       if (engine.current === client) engine.current = null;
       if (errorTimer.current) clearTimeout(errorTimer.current);
@@ -201,6 +205,8 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     try { attempted = toUci(new Chess(before).move({ from: sourceSquare, to: targetSquare, promotion })); }
     catch { setMessage("That move is not legal in this position."); return false; }
     setShowError(false);
+    setShowSuccess(false);
+    if (successTimer.current) clearTimeout(successTimer.current);
     hintAbort.current?.abort();
     setHintLoading(false);
     void run(async (controller) => {
@@ -218,6 +224,9 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
         errorTimer.current = setTimeout(() => setShowError(false), 900);
         return;
       }
+      setShowSuccess(true);
+      if (successTimer.current) clearTimeout(successTimer.current);
+      successTimer.current = setTimeout(() => setShowSuccess(false), 900);
       applyUci(game.current, attempted);
       setHint(null);
       setHintStage(0);
@@ -308,6 +317,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           arrows,
         }} />
         <ErrorOverlay visible={showError} />
+        <SuccessOverlay visible={showSuccess} />
         {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : phase === "checking" ? "Checking your move…" : "Choosing an opponent reply…"}</div>}
       </div>
     </div>
