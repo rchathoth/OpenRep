@@ -25,6 +25,9 @@ illustrations, language, and palette.
   visually legible. Progress always comes from the actual session.
 - **Simple words, real actions.** Explain what to do next. Every navigation item
   and control must have a working destination or action.
+- **Let the design speak.** Keep one brand statement and essential instructions.
+  Omit marketing subtext, numbered section markers, board captions, redundant
+  counters, and explanatory sections that repeat what the controls already show.
 
 ## Color system
 
@@ -37,7 +40,7 @@ illustrations, language, and palette.
 | `--accent` | `#C4DDB0` | Pastel green; primary action, brand tile, selected controls |
 | `--accent-hover` | `#B5D29D` | Hover on primary actions |
 | `--accent-ink` | `#354A2B` | Accessible green text, links, focus and selection outlines |
-| `--accent-soft` | `#EAF1E2` | Quiet green status and method surfaces |
+| `--accent-soft` | `#EAF1E2` | Quiet green status surfaces |
 | `--border` | `#DADDD0` | Layout rules and panel edges |
 | `--control-border` | `#8B927F` | Form-control boundaries |
 | `--board-light` | `#F0F0DE` | Light chess squares |
@@ -56,13 +59,12 @@ remain amber so that they stay distinct from green selection and success.
 - Display: `Georgia, "Times New Roman", serif`. These system fonts give the app a
   classic editorial voice with no external font requests or layout shifts.
 - UI: `Arial, Helvetica, sans-serif`. Use crisp, familiar type for controls,
-  instructions, engine messages, and move counts.
+  essential instructions, engine messages, and move counts.
 - Wordmark: lowercase **open rep**, bold serif, tight tracking, 32px desktop.
 - Hero: 56–64px desktop, 38–44px mobile; regular serif, tight line-height. Emphasize
   the second phrase in italic, rather than introducing another typeface.
 - Screen headings: 28–32px serif. Panel headings: 22–24px serif.
-- Body and controls: 14–15px with generous line-height. Supporting labels: 12px;
-  section markers: 10–11px uppercase with modest letter-spacing.
+- Body and controls: 14–15px with generous line-height. Supporting labels: 12px.
 - Use tabular numbers for progress. Keep long messages free to wrap.
 
 ## Brand and iconography
@@ -83,21 +85,19 @@ visible text labels; icons do not replace accessible control names.
 
 ## Layout
 
-1. A thin header: brand at left, working links to **Practice** and **The method**,
-   and a small current-phase indicator. An ivory background and bottom rule.
-2. A compact editorial introduction: an eyebrow, a two-line serif statement,
-   one sentence about practice, and the knight illustration at right. Training
+1. A thin header: brand at left, ivory background, and a bottom rule.
+2. A compact editorial introduction: a two-line serif statement
+   and the knight illustration at right. Training
    uses a shorter introduction so attention returns to the board.
 3. The workspace: a large square board at left, a narrower controls panel at
-   right. Numbered section labels establish a natural reading order. Frame the
+   right. Headings establish a natural reading order. Frame the
    board with solid paper and a fine border; keep the chessboard itself square.
 4. Setup: two six-piece palettes, playing-side settings, flip/reset actions, and
    a full-width pastel-green **Start training** button.
 5. Training: actual half-move progress, playing side, a live turn/status card,
    hints, promotion selection, return to setup, and engine license links.
-6. A small method section beneath the workspace describes the existing flow:
-   choose a position, find the strongest move, repeat and build your repertoire.
-7. A quiet footer with the wordmark and a short practice-oriented sign-off.
+6. End at the workspace. No method section, marketing footer, or repeated brand
+   copy. Keep engine license links in the training panel.
 
 Maximum content width: 1120px. Desktop workspace: flexible board column plus a
 352px control column, separated by 32px. At 900px and below, stack the panel under

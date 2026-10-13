@@ -296,12 +296,11 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   return <section className="workspace" aria-labelledby="training-title">
     <div className="board-column">
       <div className="screen-heading">
-        <p className="eyebrow section-eyebrow">01 / YOUR PRACTICE</p>
         <h2 id="training-title">Find the strongest move</h2>
-        <p>Drag a piece, or tap it and then its destination.</p>
+        <p>Drag a piece, or tap its start and destination.</p>
       </div>
       <div className="board-frame">
-        <div className="board-meta"><span>ONE MOVE AT A TIME</span><span><span className={`side-indicator side-${sideToMove}`} aria-hidden="true" />{sideToMove === "w" ? "White" : "Black"} to move</span></div>
+        <div className="board-meta"><span><span className={`side-indicator side-${sideToMove}`} aria-hidden="true" />{sideToMove === "w" ? "White" : "Black"} to move</span></div>
         <div className="board-shell" {...boardTap.handlers}
           data-fen={fen}
           data-engine-status={engineStatus}
@@ -325,16 +324,13 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           <SuccessOverlay visible={showSuccess} />
           {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding a hint…" : phase === "checking" ? "Checking your move…" : "Choosing an opponent reply…"}</div>}
         </div>
-        <div className="board-caption"><span>Think it through. Trust your move.</span><span>{complete ? "Practice complete." : "Every rep counts."}</span></div>
       </div>
     </div>
     <aside className="control-panel training-panel" aria-label="Training controls">
-      <div className="panel-heading"><p className="eyebrow">02 / BUILD YOUR INSTINCT</p><h3>Stay with the position.</h3></div>
       <div className="session-summary">
         <span className="side-badge">Playing {playerSide === "w" ? "White" : "Black"}</span>
-        <div className="progress-heading"><span>Practice progress</span><span>{plies}<span className="progress-total"> / {MAX_TRAINING_PLIES}</span></span></div>
+        <div className="progress-heading"><span>Progress</span><span>{plies}<span className="progress-total"> / {MAX_TRAINING_PLIES}</span></span></div>
         <progress className="session-progress" value={plies} max={MAX_TRAINING_PLIES} aria-label="Half-moves practiced">{plies} / {MAX_TRAINING_PLIES}</progress>
-        <p className="setup-note">{plies} / {MAX_TRAINING_PLIES} half-moves practiced · {complete ? (completionReason === "depth-limit" ? "Practice depth reached" : completionReason) : `${playerTurn ? "Your" : "Opponent's"} turn`}</p>
       </div>
       <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
         <h3><span className={busy || hintLoading ? "status-dot loading" : "status-dot"} />{statusTitle}</h3>
@@ -349,7 +345,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           <button type="button" className="button-secondary" onClick={() => void handleHint()}
             disabled={busy || unavailable || complete || !playerTurn || hintLoading}
             aria-label="Hint" data-hint-stage={hintStage}><Icon name="hint" />{hintLoading ? "Hint…" : "Hint"}</button>
-          <span className="setup-note">{["No visual hint", "Piece highlighted", "Move shown"][hintStage]}</span>
+          {hintStage > 0 && <span className="setup-note">{hintStage === 1 ? "Piece highlighted" : "Move shown"}</span>}
         </div>
         <div role="status" aria-label="Hint" aria-atomic="true">
           {hint && !complete && <p className="hint-card"><strong>Hint</strong> {hintText(hint)}</p>}

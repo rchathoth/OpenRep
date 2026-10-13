@@ -25,9 +25,8 @@ export default function TrainingCompleteDialog({ open, onPracticeDifferentLines,
     onCancel={(event) => { event.preventDefault(); onReview(); }}
     onClose={() => { if (open) onReview(); }}>
     <span className="dialog-brand"><BrandMark /></span>
-    <p className="eyebrow">ONE LINE STRONGER</p>
     <h2 id="training-complete-title">Good depth reached</h2>
-    <p id="training-complete-description">You&apos;ve practiced this line to a good depth — 10 moves. Go back and practice different lines to build a broader repertoire.</p>
+    <p id="training-complete-description">10 moves practiced. Explore another line or review this one.</p>
     <div className="dialog-actions">
       <button ref={primary} type="button" className="button-primary" onClick={onPracticeDifferentLines}>Practice different lines<Icon name="arrow" /></button>
       <button type="button" className="button-secondary" onClick={onReview}>Review this line</button>
