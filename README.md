@@ -2,6 +2,13 @@
 
 A minimal chess trainer using Next.js App Router, React, Tailwind, react-chessboard, chess.js, and browser-local Stockfish 19.
 
+## Design
+
+[design.md](design.md) defines Open Rep's ivory, pastel-green, and serif visual
+system, including the original brand mark, responsive layout, feedback states,
+and accessibility requirements. Shared styling lives in `app/globals.css`, brand
+artwork in `components/Brand.tsx`, and board colors in `components/boardAppearance.ts`.
+
 ## Run
 
 Use Node 22.18+ or Node 24+, then:
