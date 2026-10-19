@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Chess } from 'chess.js';
+import { getOpponentMove } from '../lib/opponent.ts';
 import { getCompletionReason, MAX_TRAINING_PLIES } from '../lib/session.ts';
 
 function apply(game, sequence) { for (const [from, to] of sequence) game.move({ from, to }); }
 
-test('session limit counts only new committed plies independent of FEN fullmove and side', () => {
+test('session limit counts only new committed plies independent of FEN fullmove and side', async () => {
   assert.equal(MAX_TRAINING_PLIES, 20);
   const scenarios = [
     ['rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', [['g1','f3'],['g8','f6'],['b1','c3'],['b8','c6'],['a2','a3'],['a7','a6'],['h2','h3'],['h7','h6'],['d2','d3'],['d7','d6'],['c1','d2'],['c8','d7'],['a1','b1'],['a8','b8'],['b2','b3'],['b7','b6'],['e2','e3'],['e7','e6'],['f1','e2'],['f8','e7']]],
@@ -20,6 +21,7 @@ test('session limit counts only new committed plies independent of FEN fullmove 
     apply(game, line.slice(18));
     assert.equal(game.history().length, 20);
     assert.equal(getCompletionReason(game), 'depth-limit');
+    await assert.rejects(getOpponentMove(game, new AbortController().signal, { findCandidateMoves() { assert.fail('Completed sessions must not request replies'); } }), /session is complete/);
   }
 });
 

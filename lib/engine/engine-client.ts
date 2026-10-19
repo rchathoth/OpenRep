@@ -1,5 +1,5 @@
 import { defaultSettings, validateMovetime, validateSettings } from "./settings.ts";
-import type { EngineCommand, EngineEvent, EngineRequest, EngineSettings, EngineStatus, MoveEngine } from "./types.ts";
+import type { CandidateRequest, EngineAnalysis, EngineCommand, EngineEvent, EngineRequest, EngineSettings, EngineStatus, MoveEngine } from "./types.ts";
 
 export type WorkerPort = Pick<Worker, "postMessage" | "terminate" | "onmessage" | "onerror" | "onmessageerror">;
 type Options = {
@@ -12,8 +12,8 @@ type Options = {
 };
 type Pending = {
   id: number;
-  request: EngineRequest;
-  resolve: (move: string) => void;
+  request: CandidateRequest;
+  resolve: (result: EngineAnalysis) => void;
   reject: (error: Error) => void;
   cleanup: () => void;
   settled: boolean;
@@ -67,10 +67,21 @@ export class EngineClient implements MoveEngine {
   }
 
   findBestMove(request: EngineRequest): Promise<string> {
+    return this.search({ ...request, multiPV: 1 }).then(result => result.move);
+  }
+
+  findCandidateMoves(request: CandidateRequest): Promise<EngineAnalysis> {
+    return this.search(request);
+  }
+
+  private search(request: CandidateRequest): Promise<EngineAnalysis> {
+    if (!Number.isInteger(request.multiPV) || request.multiPV < 1 || request.multiPV > 5) {
+      return Promise.reject(new Error("MultiPV must be between 1 and 5."));
+    }
     if (request.signal?.aborted) return Promise.reject(aborted());
     try { validateMovetime(request.movetime ?? this.settings.movetime); }
     catch (error) { return Promise.reject(error); }
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<EngineAnalysis>((resolve, reject) => {
       const entry: Pending = { id: this.nextId++, request, resolve, reject, cleanup: () => {}, settled: false };
       const cancel = () => this.cancel(entry, aborted());
       request.signal?.addEventListener("abort", cancel, { once: true });
@@ -88,12 +99,12 @@ export class EngineClient implements MoveEngine {
     catch { this.fail(); }
   }
 
-  private settle(entry: Pending, error?: Error, move?: string) {
+  private settle(entry: Pending, error?: Error, result?: EngineAnalysis) {
     if (entry.settled) return;
     entry.settled = true;
     entry.cleanup();
     if (error) entry.reject(error);
-    else entry.resolve(move!);
+    else entry.resolve(result!);
   }
 
   private pump() {
@@ -106,7 +117,7 @@ export class EngineClient implements MoveEngine {
     entry.deadline = Date.now() + timeout;
     this.setStatus("thinking");
     this.timer = setTimeout(() => this.cancel(entry, new Error("Engine search timed out. Please retry.")), timeout);
-    this.post({ type: "search", id: entry.id, fen: entry.request.fen, movetime, depth: this.settings.depth });
+    this.post({ type: "search", id: entry.id, fen: entry.request.fen, movetime, depth: this.settings.depth, multiPV: entry.request.multiPV });
   }
 
   private receive(event: EngineEvent) {
@@ -129,7 +140,7 @@ export class EngineClient implements MoveEngine {
       if (late) this.settle(entry, new Error("Engine search timed out. Please retry."));
       else if (event.type === "error") this.settle(entry, new Error(event.message));
       else if (typeof event.move !== "string") this.settle(entry, new Error("Invalid engine response. Please retry."));
-      else this.settle(entry, undefined, event.move);
+      else this.settle(entry, undefined, { move: event.move, lines: event.lines ?? [] });
       this.setStatus("ready");
       this.pump();
     }

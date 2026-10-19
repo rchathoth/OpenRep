@@ -207,3 +207,47 @@ test('mate, stalemate, insufficient material, fifty-move and repetition draws ne
     await assert.rejects(getExpectedMove(game, new AbortController().signal, { findBestMove() { assert.fail('Must not search game-over positions'); } }), /game over/);
   }
 });
+
+test('MultiPV keeps the deepest completed depth, ignores partial depths, bounds and stale searches', () => {
+  const sent = [], events = [];
+  const session = new UciSession(command => sent.push(command), event => events.push(event));
+  session.command({ type: 'init', settings: defaultSettings() }); session.line('uciok\nreadyok');
+  session.command({ type: 'search', id: 1, fen, movetime: 500, multiPV: 3 });
+  assert.equal(sent.at(-3), 'setoption name MultiPV value 3');
+  session.line('info depth 8 multipv 1 score cp 50 pv e2e4 e7e5\ninfo depth 8 multipv 2 score cp 20 pv d2d4\ninfo depth 8 multipv 3 score mate -2 pv g1f3');
+  session.line('info depth 9 multipv 1 score cp 40 pv d2d4\ninfo depth 9 multipv 2 score cp 0 pv e2e4\ninfo depth 9 multipv 3 score mate 3 pv g1f3');
+  session.line('info depth 10 multipv 1 score cp 60 pv e2e4');
+  session.line('bestmove d2d4');
+  assert.deepEqual(events.at(-1).lines, [
+    { move: 'd2d4', score: { type: 'cp', value: 40 } },
+    { move: 'e2e4', score: { type: 'cp', value: 0 } },
+    { move: 'g1f3', score: { type: 'mate', value: 3 } },
+  ]);
+  session.command({ type: 'search', id: 2, fen, movetime: 500, multiPV: 2 });
+  session.line('info depth 1 multipv 1 score cp 50 lowerbound pv e2e4\ninfo depth 1 multipv 2 pv d2d4\nbestmove e2e4');
+  assert.deepEqual(events.at(-1).lines, [{ move: 'e2e4' }, { move: 'd2d4' }]);
+  session.command({ type: 'search', id: 3, fen, movetime: 500, multiPV: 2 });
+  session.line('info depth 1 multipv 1 score cp 50 pv e2e4\nbestmove e2e4');
+  assert.deepEqual(events.at(-1).lines, []);
+  session.command({ type: 'search', id: 4, fen, movetime: 500 });
+  assert.equal(sent.at(-3), 'setoption name MultiPV value 1');
+  session.line('bestmove e2e4');
+  assert.deepEqual(events.at(-1), { type: 'result', id: 4, move: 'e2e4' });
+});
+
+test('candidate cancellation drains before exact player search and cannot leak candidate lines', async t => {
+  const { client, worker } = harness(t); await ready(client, worker);
+  const abort = new AbortController();
+  const cancelled = assert.rejects(client.findCandidateMoves({ fen, multiPV: 5, signal: abort.signal }), { name: 'AbortError' });
+  await tick(); assert.equal(worker.searches()[0].multiPV, 5);
+  abort.abort(); await cancelled;
+  const exact = client.findBestMove({ fen }); await tick();
+  assert.equal(worker.searches().length, 1);
+  worker.emit({ type: 'result', id: 1, move: 'd2d4', lines: [{ move: 'd2d4', score: { type: 'cp', value: 30 } }] });
+  assert.equal(worker.searches()[1].multiPV, 1);
+  worker.result(2, 'e2e4'); assert.equal(await exact, 'e2e4');
+  const candidates = client.findCandidateMoves({ fen, multiPV: 2 }); await tick();
+  const lines = [{ move: 'e2e4', score: { type: 'cp', value: 10 } }];
+  worker.emit({ type: 'result', id: 3, move: 'e2e4', lines });
+  assert.deepEqual(await candidates, { move: 'e2e4', lines });
+});

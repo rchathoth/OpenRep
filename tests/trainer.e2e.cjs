@@ -10,9 +10,8 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
   const errors = [];
   async function makePage(mock = false) {
     const context = await browser.newContext({ viewport: { width: 1000, height: 1100 }, hasTouch: true });
-    await context.addInitScript(() => { window.openingMock = { moves: [], replyMoves: [], calls: [] }; });
     if (mock) await context.addInitScript(() => {
-      window.engineMock = { mode: 'ok', calls: [], stops: [], terminated: 0, delay: 250, initDelay: 150, script: [] };
+      window.engineMock = { mode: 'ok', calls: [], stops: [], terminated: 0, delay: 250, initDelay: 150, script: [], replies: [] };
       window.Worker = class {
         postMessage(message) {
           const state = window.engineMock;
@@ -29,7 +28,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
             const black = message.fen.split(' ')[1] === 'b';
             this.timer = setTimeout(() => {
               if (mode === 'validation-error' || mode === 'reply-error' && black) this.emit({ type: 'error', id: message.id, message: 'Engine search timed out. Please retry.' });
-              else this.emit({ type: 'result', id: message.id, move: mode === 'scripted' ? state.script.shift() : mode === 'malformed' ? 'bad' : mode === 'illegal' ? 'e2e5' : mode === 'mate' ? 'g6g7' : mode === 'capture' ? 'a1a2' : mode === 'promotion' ? 'a7a8n' : black ? 'e7e5' : message.fen.includes('4P3') ? 'g1f3' : 'e2e4' });
+              else this.emit({ type: 'result', id: message.id, move: message.multiPV > 1 && state.replies.length ? state.replies.shift() : mode === 'scripted' ? state.script.shift() : mode === 'malformed' ? 'bad' : mode === 'illegal' ? 'e2e5' : mode === 'mate' ? 'g6g7' : mode === 'capture' ? 'a1a2' : mode === 'promotion' ? 'a7a8n' : black ? 'e7e5' : message.fen.includes('4P3') ? 'g1f3' : 'e2e4' });
             }, state.delay);
           }
         }
@@ -38,15 +37,6 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       };
     });
     const page = await context.newPage();
-    await context.route('**/api/opening', async route => {
-      const fen = route.request().postDataJSON()?.fen;
-      const data = await page.evaluate(fen => {
-        window.openingMock.calls.push(fen);
-        const uci = window.openingMock.replyMoves.shift();
-        return { moves: uci ? [typeof uci === 'string' ? { uci, count: 10 } : uci] : window.openingMock.moves };
-      }, fen);
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
-    });
     page.on('pageerror', error => { errors.push(error.message); console.error('Browser error:', error.message); });
     return { context, page };
   }
@@ -63,10 +53,10 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       // detach before clicking toolbar buttons (the engine is still thinking).
       await page.waitForTimeout(75);
     }
-    async function start(side = 'w', mode = 'ok', wait = true, openingMoves = [], playerMoves = []) {
+    async function start(side = 'w', mode = 'ok', wait = true, replyMoves = [], playerMoves = []) {
       await page.goto(base);
       await page.evaluate(mode => { if (window.engineMock) window.engineMock.mode = mode; }, mode);
-      await page.evaluate(({ moves, playerMoves }) => { window.openingMock.moves = moves; window.openingMock.replyMoves = [...moves]; if (window.engineMock) window.engineMock.script = playerMoves; }, { moves: openingMoves, playerMoves });
+      await page.evaluate(({ replyMoves, playerMoves }) => { if (window.engineMock) { window.engineMock.script = playerMoves; window.engineMock.replies = replyMoves.map(move => typeof move === 'string' ? move : move.uci); } }, { replyMoves, playerMoves });
       if (side === 'b') await page.getByLabel('I play').selectOption('b');
       await page.getByRole('button', { name: 'Start training' }).click();
       if (wait) await ready();
@@ -85,7 +75,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     return { fen, ready, drop, start, custom };
   }
   try {
-    // Real WASM and real nested workers, with only opponent lookups permitted.
+    // Real WASM and real nested workers, with all training network access disabled.
     const live = await makePage();
     verifyDemo(await demonstrateEngine(live.page));
     console.log('PASS real worker stop, reuse, and main-thread responsiveness');
@@ -110,7 +100,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       await live.page.waitForFunction(plies => document.querySelector('.session-progress')?.value === plies, (turn + 1) * 2); await h.ready();
       assert.equal(new Chess(await h.fen()).turn(), 'w');
     }
-    assert.ok(actions.every(url => url.includes('/api/opening')), 'Only opponent opening lookups may make network requests');
+    assert.deepEqual(actions, [], 'Training must remain entirely local');
     await live.page.waitForTimeout(350);
     await live.page.screenshot({ path: '/private/tmp/openreps-desktop.png', fullPage: true });
     await live.context.setOffline(false);
@@ -133,15 +123,13 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     const shot = name => page.screenshot({ path: `/private/tmp/openreps-${name}.png`, fullPage: true });
     await start('b', 'ok', true, [{ uci: 'e2e4', count: 25 }]);
     await page.waitForFunction(() => document.querySelector('.board-shell')?.getAttribute('data-fen')?.includes('4P3'));
-    assert.equal((await calls()).length, 0, 'Starting as Black should use the database opening move without a search');
-    await page.evaluate(() => { window.openingMock.moves = []; });
-    await start();
-    await page.evaluate(() => { window.openingMock.moves = [{ uci: 'c7c5', count: 25 }]; });
+    assert.equal((await calls()).length, 1, 'Starting as Black should search opponent candidates');
+    assert.equal((await calls())[0].multiPV, 5);
+    await start('w', 'ok', true, ['c7c5']);
     await drop('e2', 'e4'); await ready();
-    assert.match(await fen(), /2p5/); assert.equal((await calls()).length, 1, 'A database reply should not start an opponent search');
-    assert.equal((await page.evaluate(() => window.openingMock.calls)).length, 1);
-    await page.evaluate(() => { window.openingMock.moves = []; });
-    console.log('PASS Lichess replies, distinct from Stockfish, and database opening when playing Black');
+    assert.match(await fen(), /2p5/);
+    assert.deepEqual((await calls()).map(call => call.multiPV), [1, 5]);
+    console.log('PASS local opponent search and exact player validation');
     const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8','g2g3','g7g5','c3b5','b8c6','b5a7','d8d7','f3d4','f6f5','a2a4','h7h5'];
     async function reachDepth(side) {
       const playerMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 0 : 1));
@@ -154,8 +142,8 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       }
       await page.getByRole('dialog', { name: 'Good depth reached' }).waitFor();
       assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '20');
-      assert.equal((await calls()).length, 10);
-      return { requestCount: (await page.evaluate(() => window.openingMock.calls)).length, fen: await fen() };
+      assert.equal((await calls()).length, 20);
+      return { requestCount: (await calls()).filter(call => call.multiPV > 1).length, fen: await fen() };
     }
     const depthWhite = await reachDepth('w');
     const completionDialog = page.getByRole('dialog', { name: 'Good depth reached' });
