@@ -4,9 +4,10 @@ A minimal chess trainer using Next.js App Router, React, Tailwind, react-chessbo
 
 ## Design
 
-[design.md](design.md) defines Open Rep's ivory, pastel-green, and serif visual
-system, including the original brand mark, responsive layout, feedback states,
-and accessibility requirements. Shared styling lives in `app/globals.css`, brand
+[DESIGN.md](DESIGN.md) records the Club Modern visual system: muted walnut,
+stone and chalk surfaces, self-hosted Hanken Grotesk, responsive controls, and
+semantic feedback. The machine-readable extensions and component previews live
+in `.impeccable/design.json`. Shared styling lives in `app/globals.css`, SVG brand
 artwork in `components/Brand.tsx`, and board colors in `components/boardAppearance.ts`.
 
 ## Run
@@ -20,7 +21,7 @@ npm run dev
 
 Open http://localhost:3000. Arrange a position, choose your side, and start training. The board and controls sit side by side on desktop and stack on smaller screens. Choose a piece and tap a square to place it; toggle **Remove pieces** to erase pieces on touch devices. Reset restores the standard position and White to move while retaining your playing side and board orientation. The untouched standard position retains castling rights. Custom arrangements start without castling or en-passant rights. Choose the promotion piece before moving a pawn to the last rank.
 
-During training, drag a piece or tap your piece and then its destination. Tap the selected piece again to cancel, or another friendly piece to switch selection. Taps and drops use the same engine validation, including the selected promotion piece. Visual hints remain amber; tap selection has a green outline.
+During training, drag a piece or tap your piece and then its destination. Tap the selected piece again to cancel, or another friendly piece to switch selection. Taps and drops use the same engine validation, including the selected promotion piece. Visual hints remain amber; tap selection has a walnut-brown outline.
 
 A legal attempt is compared to Stockfish's exact best move from the **pre-move** position. Incorrect moves snap back with a red X. A correct move is committed only after engine validation, then Stockfish searches up to five opponent candidate lines. From the deepest completed depth, the app samples uniformly among legal moves within 100 centipawns of the best score. Winning mate alternatives must preserve a forced mate; losing mate alternatives cannot allow a faster mate. A sole qualifying move or unavailable exact scores uses the best move. Starting as Black uses the same reply flow. Each session ends at checkmate, a draw, or after 20 committed half-moves (10 full moves) from the supplied starting position, regardless of the FEN move number or side to move.
 

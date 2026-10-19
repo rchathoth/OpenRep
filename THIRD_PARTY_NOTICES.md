@@ -27,3 +27,7 @@ The engine's JS and WASM are copied without modification by
 the corresponding source available alongside any deployed/distributed engine.
 If you change the engine, supply the corresponding modified source and build
 instructions and update the versioned asset path and notices.
+
+## Hanken Grotesk
+
+The self-hosted variable font in `public/fonts/hanken-grotesk/` is Hanken Grotesk by Alfredo Marco Pradil, licensed under the SIL Open Font License 1.1. See `public/fonts/hanken-grotesk/OFL.txt`. Source: https://github.com/google/fonts/tree/main/ofl/hankengrotesk.

@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-19T19:27:44.632168+00:00",
+  "title": "Design System: open rep",
+  "extensions": {
+    "colorMeta": {
+      "page": {
+        "role": "neutral",
+        "displayName": "Page",
+        "tonalRamp": [
+          "oklch(15% 0.00801 73.74)",
+          "oklch(25% 0.00801 73.74)",
+          "oklch(35% 0.00801 73.74)",
+          "oklch(45% 0.00801 73.74)",
+          "oklch(55% 0.00801 73.74)",
+          "oklch(68% 0.00801 73.74)",
+          "oklch(82% 0.00801 73.74)",
+          "oklch(95% 0.00801 73.74)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0.00451 78.30)",
+          "oklch(25% 0.00451 78.30)",
+          "oklch(35% 0.00451 78.30)",
+          "oklch(45% 0.00451 78.30)",
+          "oklch(55% 0.00451 78.30)",
+          "oklch(68% 0.00451 78.30)",
+          "oklch(82% 0.00451 78.30)",
+          "oklch(95% 0.00451 78.30)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "tonalRamp": [
+          "oklch(15% 0.00942 67.41)",
+          "oklch(25% 0.00942 67.41)",
+          "oklch(35% 0.00942 67.41)",
+          "oklch(45% 0.00942 67.41)",
+          "oklch(55% 0.00942 67.41)",
+          "oklch(68% 0.00942 67.41)",
+          "oklch(82% 0.00942 67.41)",
+          "oklch(95% 0.00942 67.41)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary",
+        "tonalRamp": [
+          "oklch(15% 0.02222 62.06)",
+          "oklch(25% 0.02222 62.06)",
+          "oklch(35% 0.02222 62.06)",
+          "oklch(45% 0.02222 62.06)",
+          "oklch(55% 0.02222 62.06)",
+          "oklch(68% 0.02222 62.06)",
+          "oklch(82% 0.02222 62.06)",
+          "oklch(95% 0.02222 62.06)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "oklch(15% 0.03480 55.47)",
+          "oklch(25% 0.03480 55.47)",
+          "oklch(35% 0.03480 55.47)",
+          "oklch(45% 0.03480 55.47)",
+          "oklch(55% 0.03480 55.47)",
+          "oklch(68% 0.03480 55.47)",
+          "oklch(82% 0.03480 55.47)",
+          "oklch(95% 0.03480 55.47)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Accent hover",
+        "tonalRamp": [
+          "oklch(15% 0.03299 56.08)",
+          "oklch(25% 0.03299 56.08)",
+          "oklch(35% 0.03299 56.08)",
+          "oklch(45% 0.03299 56.08)",
+          "oklch(55% 0.03299 56.08)",
+          "oklch(68% 0.03299 56.08)",
+          "oklch(82% 0.03299 56.08)",
+          "oklch(95% 0.03299 56.08)"
+        ]
+      },
+      "accent-ink": {
+        "role": "primary",
+        "displayName": "Accent ink",
+        "tonalRamp": [
+          "oklch(15% 0.03778 56.94)",
+          "oklch(25% 0.03778 56.94)",
+          "oklch(35% 0.03778 56.94)",
+          "oklch(45% 0.03778 56.94)",
+          "oklch(55% 0.03778 56.94)",
+          "oklch(68% 0.03778 56.94)",
+          "oklch(82% 0.03778 56.94)",
+          "oklch(95% 0.03778 56.94)"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Accent soft",
+        "tonalRamp": [
+          "oklch(15% 0.01669 70.52)",
+          "oklch(25% 0.01669 70.52)",
+          "oklch(35% 0.01669 70.52)",
+          "oklch(45% 0.01669 70.52)",
+          "oklch(55% 0.01669 70.52)",
+          "oklch(68% 0.01669 70.52)",
+          "oklch(82% 0.01669 70.52)",
+          "oklch(95% 0.01669 70.52)"
+        ]
+      },
+      "on-accent": {
+        "role": "primary",
+        "displayName": "On accent",
+        "tonalRamp": [
+          "oklch(15% 0.00451 78.30)",
+          "oklch(25% 0.00451 78.30)",
+          "oklch(35% 0.00451 78.30)",
+          "oklch(45% 0.00451 78.30)",
+          "oklch(55% 0.00451 78.30)",
+          "oklch(68% 0.00451 78.30)",
+          "oklch(82% 0.00451 78.30)",
+          "oklch(95% 0.00451 78.30)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% 0.01782 67.58)",
+          "oklch(25% 0.01782 67.58)",
+          "oklch(35% 0.01782 67.58)",
+          "oklch(45% 0.01782 67.58)",
+          "oklch(55% 0.01782 67.58)",
+          "oklch(68% 0.01782 67.58)",
+          "oklch(82% 0.01782 67.58)",
+          "oklch(95% 0.01782 67.58)"
+        ]
+      },
+      "control-border": {
+        "role": "neutral",
+        "displayName": "Control border",
+        "tonalRamp": [
+          "oklch(15% 0.02676 65.41)",
+          "oklch(25% 0.02676 65.41)",
+          "oklch(35% 0.02676 65.41)",
+          "oklch(45% 0.02676 65.41)",
+          "oklch(55% 0.02676 65.41)",
+          "oklch(68% 0.02676 65.41)",
+          "oklch(82% 0.02676 65.41)",
+          "oklch(95% 0.02676 65.41)"
+        ]
+      },
+      "board-frame": {
+        "role": "neutral",
+        "displayName": "Board frame",
+        "tonalRamp": [
+          "oklch(15% 0.02470 59.47)",
+          "oklch(25% 0.02470 59.47)",
+          "oklch(35% 0.02470 59.47)",
+          "oklch(45% 0.02470 59.47)",
+          "oklch(55% 0.02470 59.47)",
+          "oklch(68% 0.02470 59.47)",
+          "oklch(82% 0.02470 59.47)",
+          "oklch(95% 0.02470 59.47)"
+        ]
+      },
+      "board-light": {
+        "role": "neutral",
+        "displayName": "Board light",
+        "tonalRamp": [
+          "oklch(15% 0.02982 75.67)",
+          "oklch(25% 0.02982 75.67)",
+          "oklch(35% 0.02982 75.67)",
+          "oklch(45% 0.02982 75.67)",
+          "oklch(55% 0.02982 75.67)",
+          "oklch(68% 0.02982 75.67)",
+          "oklch(82% 0.02982 75.67)",
+          "oklch(95% 0.02982 75.67)"
+        ]
+      },
+      "board-dark": {
+        "role": "neutral",
+        "displayName": "Board dark",
+        "tonalRamp": [
+          "oklch(15% 0.04563 63.39)",
+          "oklch(25% 0.04563 63.39)",
+          "oklch(35% 0.04563 63.39)",
+          "oklch(45% 0.04563 63.39)",
+          "oklch(55% 0.04563 63.39)",
+          "oklch(68% 0.04563 63.39)",
+          "oklch(82% 0.04563 63.39)",
+          "oklch(95% 0.04563 63.39)"
+        ]
+      },
+      "board-coordinate-light": {
+        "role": "neutral",
+        "displayName": "Board coordinate light",
+        "tonalRamp": [
+          "oklch(15% 0.03778 56.94)",
+          "oklch(25% 0.03778 56.94)",
+          "oklch(35% 0.03778 56.94)",
+          "oklch(45% 0.03778 56.94)",
+          "oklch(55% 0.03778 56.94)",
+          "oklch(68% 0.03778 56.94)",
+          "oklch(82% 0.03778 56.94)",
+          "oklch(95% 0.03778 56.94)"
+        ]
+      },
+      "board-coordinate-dark": {
+        "role": "neutral",
+        "displayName": "Board coordinate dark",
+        "tonalRamp": [
+          "oklch(15% 0.01955 63.53)",
+          "oklch(25% 0.01955 63.53)",
+          "oklch(35% 0.01955 63.53)",
+          "oklch(45% 0.01955 63.53)",
+          "oklch(55% 0.01955 63.53)",
+          "oklch(68% 0.01955 63.53)",
+          "oklch(82% 0.01955 63.53)",
+          "oklch(95% 0.01955 63.53)"
+        ]
+      },
+      "error-ink": {
+        "role": "secondary",
+        "displayName": "Error ink",
+        "tonalRamp": [
+          "oklch(15% 0.11889 30.65)",
+          "oklch(25% 0.11889 30.65)",
+          "oklch(35% 0.11889 30.65)",
+          "oklch(45% 0.11889 30.65)",
+          "oklch(55% 0.11889 30.65)",
+          "oklch(68% 0.11889 30.65)",
+          "oklch(82% 0.11889 30.65)",
+          "oklch(95% 0.11889 30.65)"
+        ]
+      },
+      "error-surface": {
+        "role": "secondary",
+        "displayName": "Error surface",
+        "tonalRamp": [
+          "oklch(15% 0.01830 43.22)",
+          "oklch(25% 0.01830 43.22)",
+          "oklch(35% 0.01830 43.22)",
+          "oklch(45% 0.01830 43.22)",
+          "oklch(55% 0.01830 43.22)",
+          "oklch(68% 0.01830 43.22)",
+          "oklch(82% 0.01830 43.22)",
+          "oklch(95% 0.01830 43.22)"
+        ]
+      },
+      "hint-ink": {
+        "role": "secondary",
+        "displayName": "Hint ink",
+        "tonalRamp": [
+          "oklch(15% 0.08494 76.30)",
+          "oklch(25% 0.08494 76.30)",
+          "oklch(35% 0.08494 76.30)",
+          "oklch(45% 0.08494 76.30)",
+          "oklch(55% 0.08494 76.30)",
+          "oklch(68% 0.08494 76.30)",
+          "oklch(82% 0.08494 76.30)",
+          "oklch(95% 0.08494 76.30)"
+        ]
+      },
+      "hint-surface": {
+        "role": "secondary",
+        "displayName": "Hint surface",
+        "tonalRamp": [
+          "oklch(15% 0.02656 87.85)",
+          "oklch(25% 0.02656 87.85)",
+          "oklch(35% 0.02656 87.85)",
+          "oklch(45% 0.02656 87.85)",
+          "oklch(55% 0.02656 87.85)",
+          "oklch(68% 0.02656 87.85)",
+          "oklch(82% 0.02656 87.85)",
+          "oklch(95% 0.02656 87.85)"
+        ]
+      },
+      "success-ink": {
+        "role": "secondary",
+        "displayName": "Success ink",
+        "tonalRamp": [
+          "oklch(15% 0.03985 149.96)",
+          "oklch(25% 0.03985 149.96)",
+          "oklch(35% 0.03985 149.96)",
+          "oklch(45% 0.03985 149.96)",
+          "oklch(55% 0.03985 149.96)",
+          "oklch(68% 0.03985 149.96)",
+          "oklch(82% 0.03985 149.96)",
+          "oklch(95% 0.03985 149.96)"
+        ]
+      },
+      "success-surface": {
+        "role": "secondary",
+        "displayName": "Success surface",
+        "tonalRamp": [
+          "oklch(15% 0.01640 133.83)",
+          "oklch(25% 0.01640 133.83)",
+          "oklch(35% 0.01640 133.83)",
+          "oklch(45% 0.01640 133.83)",
+          "oklch(55% 0.01640 133.83)",
+          "oklch(68% 0.01640 133.83)",
+          "oklch(82% 0.01640 133.83)",
+          "oklch(95% 0.01640 133.83)"
+        ]
+      },
+      "hint-arrow": {
+        "role": "secondary",
+        "displayName": "Hint arrow",
+        "tonalRamp": [
+          "oklch(15% 0.16466 70.08)",
+          "oklch(25% 0.16466 70.08)",
+          "oklch(35% 0.16466 70.08)",
+          "oklch(45% 0.16466 70.08)",
+          "oklch(55% 0.16466 70.08)",
+          "oklch(68% 0.16466 70.08)",
+          "oklch(82% 0.16466 70.08)",
+          "oklch(95% 0.16466 70.08)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Task heading",
+        "purpose": "Responsive task headings; 32px at tablet and 28px on phones."
+      },
+      "headline": {
+        "displayName": "Dialog heading",
+        "purpose": "Completion heading; 28px on phones."
+      },
+      "title": {
+        "displayName": "Panel title",
+        "purpose": "Panel headings; 23px on phones."
+      }
+    },
+    "shadows": [
+      {
+        "name": "board-overlay",
+        "value": "0 4px 16px #29252126",
+        "purpose": "Board status and move-result feedback overlays."
+      },
+      {
+        "name": "modal",
+        "value": "0 20px 80px #29252140",
+        "purpose": "Native completion dialog."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Shared control, progress, and notation easing."
+      },
+      {
+        "name": "control",
+        "value": "160ms",
+        "purpose": "Control background and border transitions."
+      },
+      {
+        "name": "progress",
+        "value": "250ms",
+        "purpose": "Progress-value transition."
+      },
+      {
+        "name": "move-arrival",
+        "value": "280ms",
+        "purpose": "Latest committed notation arrival."
+      },
+      {
+        "name": "feedback",
+        "value": "900ms ease-out",
+        "purpose": "Move-result overlay opacity."
+      },
+      {
+        "name": "loading",
+        "value": "1.2s ease-in-out infinite",
+        "purpose": "Pending-work status dot; disabled under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-desktop-max",
+        "value": "1199px"
+      },
+      {
+        "name": "single-column-max",
+        "value": "900px"
+      },
+      {
+        "name": "phone-max",
+        "value": "599px"
+      },
+      {
+        "name": "narrow-phone-max",
+        "value": "359px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main action in walnut and chalk.",
+      "html": "<button class=\"ds-primary\">Start training</button>",
+      "css": ".ds-primary{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:44px;min-height:44px;padding:11px 14px;border:1px solid var(--control-border, #a99a8c);border-radius:var(--radius-sm, 6px);font-size:13px;font-weight:600;cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),border-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;min-height:50px;background:var(--accent, #756052);border-color:var(--accent, #756052);color:var(--on-accent, #fcfaf7)}.ds-primary:hover:not(:disabled){background:var(--accent-hover, #604d40);border-color:var(--accent-hover, #604d40)}.ds-primary:focus-visible{outline:3px solid var(--accent-ink, #584334);outline-offset:4px;}.ds-primary:active:not(:disabled){filter:brightness(.96)}.ds-primary:disabled{cursor:not-allowed;border-color:var(--border, #cdc3b9);background:#e7e2dc;color:#75685e}@media(prefers-reduced-motion:reduce){.ds-primary,.ds-secondary,.ds-field{transition:none}}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet action with an explicit pressed state.",
+      "html": "<button class=\"ds-secondary\" aria-pressed=\"true\">Remove pieces</button>",
+      "css": ".ds-secondary{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-width:44px;min-height:44px;padding:11px 14px;border:1px solid var(--control-border, #a99a8c);border-radius:var(--radius-sm, 6px);font-size:13px;font-weight:600;cursor:pointer;transition:background-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1)),border-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;background:transparent;color:var(--text, #292521)}.ds-secondary:hover:not(:disabled),.ds-secondary[aria-pressed=\"true\"]{background:var(--accent-soft, #e9e0d6);border-color:var(--accent-ink, #584334)}.ds-secondary[aria-pressed=\"true\"]{color:var(--accent-ink, #584334)}.ds-secondary:focus-visible{outline:3px solid var(--accent-ink, #584334);outline-offset:4px;}.ds-secondary:active:not(:disabled){filter:brightness(.96)}.ds-secondary:disabled{cursor:not-allowed;border-color:var(--border, #cdc3b9);background:#e7e2dc;color:#75685e}@media(prefers-reduced-motion:reduce){.ds-primary,.ds-secondary,.ds-field{transition:none}}"
+    },
+    {
+      "name": "Select field",
+      "kind": "input",
+      "refersTo": "select-control",
+      "description": "Visible label and native select affordance.",
+      "html": "<label class=\"ds-label\">I play<select class=\"ds-field\"><option>White</option><option>Black</option></select></label>",
+      "css": ".ds-label{display:block;color:var(--secondary, #65594f);font-size:13px;font-weight:550;font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}.ds-field{display:block;width:100%;min-height:44px;margin-top:8px;padding:11px 12px;border:1px solid var(--control-border, #a99a8c);border-radius:var(--radius-sm, 6px);background:var(--surface, #fcfaf7);color:var(--text, #292521);font-size:14px;font-weight:500;transition:border-color 160ms var(--ease-out, cubic-bezier(.16,1,.3,1));font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}.ds-field:hover:not(:disabled){border-color:var(--accent-ink, #584334)}.ds-field:focus-visible{outline:3px solid var(--accent-ink, #584334);outline-offset:4px;}.ds-field:disabled{cursor:not-allowed;border-color:var(--border, #cdc3b9);background:#e7e2dc;color:#75685e}@media(prefers-reduced-motion:reduce){.ds-primary,.ds-secondary,.ds-field{transition:none}}"
+    },
+    {
+      "name": "Practice navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Active practice link on the walnut header.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main navigation\"><a href=\"#practice\" aria-current=\"page\">Opening practice</a></nav>",
+      "css": ".ds-nav{display:flex;min-height:80px;background:var(--accent, #756052);font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}.ds-nav a{display:flex;align-items:center;position:relative;min-height:44px;color:var(--on-accent, #fcfaf7);font-size:14px;font-weight:550;text-decoration:none}.ds-nav a::after{content:\"\";position:absolute;inset-inline:0;bottom:0;height:2px;background:#e0ccba}.ds-nav a:focus-visible{outline:3px solid var(--on-accent, #fcfaf7);outline-offset:4px}"
+    },
+    {
+      "name": "Playing-side badge",
+      "kind": "chip",
+      "refersTo": "side-badge",
+      "description": "Compact noninteractive session identity.",
+      "html": "<span class=\"ds-badge\">Playing White</span>",
+      "css": ".ds-badge{display:inline-block;padding:5px 9px;border-radius:4px;background:var(--accent-soft, #e9e0d6);color:var(--accent-ink, #584334);font-size:12px;font-weight:600;font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}"
+    },
+    {
+      "name": "Control panel",
+      "kind": "card",
+      "refersTo": "control-panel",
+      "description": "Flat chalk container for related controls.",
+      "html": "<section class=\"ds-panel\"><h3>Build your position</h3><p>Choose a piece, then tap a square.</p></section>",
+      "css": ".ds-panel{display:flex;flex-direction:column;gap:20px;padding:28px;border-radius:var(--radius-panel, 12px);background:var(--surface, #fcfaf7);color:var(--text, #292521);font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}.ds-panel h3{margin:0;font-size:24px;font-weight:650;line-height:1.2;letter-spacing:-.025em}.ds-panel p{margin:0;color:var(--secondary, #65594f);font-size:14px}"
+    },
+    {
+      "name": "Training status",
+      "kind": "card",
+      "refersTo": "status-card",
+      "description": "Heading, state dot, and explanation share a tonal surface.",
+      "html": "<section class=\"ds-status\" aria-live=\"polite\"><h3><span class=\"ds-dot\" aria-hidden=\"true\"></span>Your turn</h3><p>Find the strongest move.</p></section>",
+      "css": ".ds-status{display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:var(--radius-sm, 6px);background:var(--accent-soft, #e9e0d6);color:var(--text, #292521);font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}.ds-status h3{display:flex;align-items:center;gap:10px;margin:0;font-size:22px;font-weight:650;line-height:1.2;letter-spacing:-.02em}.ds-status p{margin:0;color:var(--secondary, #65594f);font-size:13px;line-height:1.6}.ds-dot{width:7px;height:7px;border-radius:50%;background:var(--accent-ink, #584334)}"
+    },
+    {
+      "name": "Committed move pair",
+      "kind": "custom",
+      "description": "Recorded notation with the latest committed move emphasized.",
+      "html": "<ol class=\"ds-moves\"><li><span class=\"ds-number\">1.</span><span>e4</span><span class=\"ds-latest\">e5</span></li></ol>",
+      "css": ".ds-moves{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0;font-variant-numeric:tabular-nums;font-family:var(--display-font, \"Hanken Grotesk\", Arial, sans-serif);line-height:1.5;}.ds-moves li{display:inline-grid;grid-template-columns:25px minmax(35px,auto) minmax(35px,auto);align-items:center;column-gap:5px;min-height:36px;padding:3px 6px;border-radius:4px;background:#dfd6cc;color:var(--text, #292521);font-size:13px}.ds-moves li>span{padding:4px}.ds-moves .ds-number{padding-inline:0;color:var(--secondary, #65594f);font-size:11px}.ds-latest{border-radius:3px;background:var(--accent, #756052);color:var(--on-accent, #fcfaf7)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Club Modern",
+    "overview": "Club Modern takes its character from a contemporary chess club: muted walnut, stone ground, chalk surfaces, and warm ink. Hanken Grotesk gives headings and controls the same clear, humanist voice. The geometric SVG mark carries the identity without ornamental illustration.\n\nThe working interface is compact but comfortably spaced. Tonal surfaces group related controls, a dark perimeter gives the board weight, and short transitions clarify state. Terracotta, amber, and muted green communicate errors, hints, and completion; they do not replace the brown identity palette.",
+    "keyCharacteristics": [
+      "Muted walnut identity with chalk control surfaces.",
+      "One humanist sans family with compact, moderately weighted headings.",
+      "Small control corners, roomier panel corners, and restrained depth.",
+      "Explicit labels, visible focus, and semantic feedback beyond color."
+    ],
+    "rules": [
+      {
+        "name": "The Brown Identity Rule",
+        "body": "Use walnut for identity, primary actions, and selected states; reserve terracotta, amber, and muted green for feedback.",
+        "section": "colors"
+      },
+      {
+        "name": "The Shared Voice Rule",
+        "body": "Use Hanken Grotesk for headings, body copy, controls, and chess notation; use weight and size to establish hierarchy.",
+        "section": "typography"
+      },
+      {
+        "name": "The Grounded Surface Rule",
+        "body": "Keep ordinary panels flat; reserve shadows for board overlays and modal elevation.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do reuse the CSS custom properties for colors and the existing SVG mark and icons.",
+      "Do pair feedback color with text, a recognizable icon, or a visible state treatment.",
+      "Do keep controls at least 44px tall and preserve the visible focus outline.",
+      "Do retain reduced-motion and forced-colors treatments on new components."
+    ],
+    "donts": [
+      "Don't restore the superseded pastel-green and serif visual identity.",
+      "Don't use feedback green as the primary action or tap-selection color.",
+      "Don't add shadows to ordinary panels or turn restrained controls into pill shapes."
+    ]
+  }
+}

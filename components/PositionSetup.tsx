@@ -109,14 +109,14 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
     setPosition((current) => ({ ...current, [square]: { pieceType: selectedPiece } })));
 
   return (
-    <section className="workspace" aria-labelledby="setup-title">
+    <section className="workspace setup-workspace" aria-labelledby="setup-title">
       <div className="board-column">
         <div className="screen-heading">
-          <h2 id="setup-title">Set up a position</h2>
+          <h2 id="setup-title">Starting position</h2>
           <p>Drag pieces, or choose one and tap a square.</p>
         </div>
         <div className="board-frame">
-          <div className="board-meta"><span><span className={`side-indicator side-${side}`} aria-hidden="true" />{side === "w" ? "White" : "Black"} to move</span></div>
+          <div className="board-meta"><span className="board-meta-label">Opening practice</span><span><span className={`side-indicator side-${side}`} aria-hidden="true" />{side === "w" ? "White" : "Black"} to move</span></div>
           <div className="board-shell" {...boardTap.handlers}>
             <Chessboard options={{
               ...boardAppearance,
@@ -131,9 +131,11 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             }} />
           </div>
         </div>
+        <div className="board-caption"><span>Arrange your position, then start.</span><span>10 moves per session</span></div>
       </div>
       <aside className="control-panel" aria-label="Position controls">
-        <div className="panel-heading"><h3>Pieces</h3><p className="active-tool" aria-live="polite">{removing ? "Remove mode" : PIECE_NAMES[selectedPiece]}</p></div>
+        <div className="panel-heading"><div><h3>Build your position</h3><p className="panel-description">Choose a piece, then tap a square.</p></div></div>
+        <div className="tool-heading"><span>Piece tools</span><p className="active-tool" aria-live="polite">{removing ? "Remove mode" : PIECE_NAMES[selectedPiece]}</p></div>
         <div className="panel-section">
           {["w", "b"].map((color) => (
             <div key={color} className="palette-group" role="group" aria-label={`${color === "w" ? "White" : "Black"} pieces`}>
@@ -176,6 +178,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
         <div className="start-actions">
           {error && <p className="error-message" role="alert">{error}</p>}
           <button type="button" className="button-primary" onClick={startTraining}>Start training <Icon name="arrow" /></button>
+          <p className="start-note">Your moves are checked against Stockfish’s best move. Hints are available as you practice.</p>
         </div>
       </aside>
     </section>

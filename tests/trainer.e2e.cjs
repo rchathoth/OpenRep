@@ -129,6 +129,8 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     await drop('e2', 'e4'); await ready();
     assert.match(await fen(), /2p5/);
     assert.deepEqual((await calls()).map(call => call.multiPV), [1, 5]);
+    assert.deepEqual(await page.locator('.move-pairs li').allTextContents(), ['1.e4c5']);
+    assert.equal(await page.locator('.latest-move').textContent(), 'c5');
     console.log('PASS local opponent search and exact player validation');
     const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8','g2g3','g7g5','c3b5','b8c6','b5a7','d8d7','f3d4','f6f5','a2a4','h7h5'];
     async function reachDepth(side) {
@@ -143,6 +145,8 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       await page.getByRole('dialog', { name: 'Good depth reached' }).waitFor();
       assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '20');
       assert.equal((await calls()).length, 20);
+      assert.equal(await page.locator('.move-pairs li').count(), 10);
+      assert.equal(await page.locator('.latest-move').textContent(), 'h5');
       return { requestCount: (await calls()).filter(call => call.multiPV > 1).length, fen: await fen() };
     }
     const depthWhite = await reachDepth('w');
