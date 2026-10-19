@@ -5,6 +5,7 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { useBoardTap } from "@/components/useBoardTap";
 import { boardAppearance } from "@/components/boardAppearance";
+import { Icon } from "@/components/Brand";
 import ErrorOverlay from "@/components/ErrorOverlay";
 import SuccessOverlay from "@/components/SuccessOverlay";
 import { applyUci, getExpectedMove, toUci } from "@/lib/training";
@@ -73,7 +74,8 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   }, []);
   const busy = engineStatus === "starting" || phase === "checking" || phase === "replying";
   const unavailable = engineStatus === "unavailable";
-  const playerTurn = new Chess(fen).turn() === playerSide;
+  const sideToMove = new Chess(fen).turn();
+  const playerTurn = sideToMove === playerSide;
 
   const expectedForPosition = useCallback(async (signal: AbortSignal) => {
     signal.throwIfAborted();
@@ -274,7 +276,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
         style={{
           width: "100%",
           height: "100%",
-          outline: isSelected ? "3px solid var(--accent)" : undefined,
+          outline: isSelected ? "3px solid var(--accent-ink)" : undefined,
           outlineOffset: "-6px",
           ...(isHighlighted ? {
             backgroundColor: "rgba(245, 158, 11, 0.45)",
@@ -295,36 +297,40 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     <div className="board-column">
       <div className="screen-heading">
         <h2 id="training-title">Find the strongest move</h2>
-        <p>Drag a piece, or tap it and then its destination.</p>
+        <p>Drag a piece, or tap its start and destination.</p>
       </div>
-      <div className="board-shell" {...boardTap.handlers}
-        data-fen={fen}
-        data-engine-status={engineStatus}
-        data-hint-stage={hintStage}
-        data-hint-piece={hintStage >= 1 && moveHint ? moveHint.fromSquare : undefined}
-        data-hint-move={hintStage >= 2 && expectedMove ? expectedMove : undefined}
-      >
-        <Chessboard options={{
-          ...boardAppearance,
-          id: "trainer-board",
-          position: fen,
-          boardOrientation,
-          onPieceDrop,
-          onSquareClick: boardTap.onSquareClick,
-          onPieceDrag: () => setSelectedSquare(null),
-          allowDragging: !busy && !unavailable && !complete && playerTurn,
-          squareRenderer,
-          arrows,
-        }} />
-        <ErrorOverlay visible={showError} />
-        <SuccessOverlay visible={showSuccess} />
-        {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : phase === "checking" ? "Checking your move…" : "Choosing an opponent reply…"}</div>}
+      <div className="board-frame">
+        <div className="board-meta"><span><span className={`side-indicator side-${sideToMove}`} aria-hidden="true" />{sideToMove === "w" ? "White" : "Black"} to move</span></div>
+        <div className="board-shell" {...boardTap.handlers}
+          data-fen={fen}
+          data-engine-status={engineStatus}
+          data-hint-stage={hintStage}
+          data-hint-piece={hintStage >= 1 && moveHint ? moveHint.fromSquare : undefined}
+          data-hint-move={hintStage >= 2 && expectedMove ? expectedMove : undefined}
+        >
+          <Chessboard options={{
+            ...boardAppearance,
+            id: "trainer-board",
+            position: fen,
+            boardOrientation,
+            onPieceDrop,
+            onSquareClick: boardTap.onSquareClick,
+            onPieceDrag: () => setSelectedSquare(null),
+            allowDragging: !busy && !unavailable && !complete && playerTurn,
+            squareRenderer,
+            arrows,
+          }} />
+          <ErrorOverlay visible={showError} />
+          <SuccessOverlay visible={showSuccess} />
+          {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding a hint…" : phase === "checking" ? "Checking your move…" : "Choosing an opponent reply…"}</div>}
+        </div>
       </div>
     </div>
     <aside className="control-panel training-panel" aria-label="Training controls">
       <div className="session-summary">
         <span className="side-badge">Playing {playerSide === "w" ? "White" : "Black"}</span>
-        <p className="setup-note">{plies} / {MAX_TRAINING_PLIES} half-moves practiced · {complete ? (completionReason === "depth-limit" ? "Practice depth reached" : completionReason) : `${playerTurn ? "Your" : "Opponent's"} turn`}</p>
+        <div className="progress-heading"><span>Progress</span><span>{plies}<span className="progress-total"> / {MAX_TRAINING_PLIES}</span></span></div>
+        <progress className="session-progress" value={plies} max={MAX_TRAINING_PLIES} aria-label="Half-moves practiced">{plies} / {MAX_TRAINING_PLIES}</progress>
       </div>
       <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
         <h3><span className={busy || hintLoading ? "status-dot loading" : "status-dot"} />{statusTitle}</h3>
@@ -338,8 +344,8 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
         <div className="hint-controls">
           <button type="button" className="button-secondary" onClick={() => void handleHint()}
             disabled={busy || unavailable || complete || !playerTurn || hintLoading}
-            aria-label="Hint" data-hint-stage={hintStage}>{hintLoading ? "Hint…" : "Hint"}</button>
-          <span className="setup-note">{["No visual hint", "Piece highlighted", "Move shown"][hintStage]}</span>
+            aria-label="Hint" data-hint-stage={hintStage}><Icon name="hint" />{hintLoading ? "Hint…" : "Hint"}</button>
+          {hintStage > 0 && <span className="setup-note">{hintStage === 1 ? "Piece highlighted" : "Move shown"}</span>}
         </div>
         <div role="status" aria-label="Hint" aria-atomic="true">
           {hint && !complete && <p className="hint-card"><strong>Hint</strong> {hintText(hint)}</p>}
@@ -352,7 +358,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           </select>
         </label>
       </div>
-      <button ref={setupButton} type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}>Setup</button>
+      <button ref={setupButton} type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}><Icon name="reset" />Setup</button>
       <p className="engine-footer">Stockfish 19 · <a href={`${ENGINE_ASSET_PATH}/COPYING.txt`} target="_blank" rel="noreferrer">GPLv3</a> · <a href={`${ENGINE_ASSET_PATH}/SOURCE.txt`} target="_blank" rel="noreferrer">Source code &amp; notices</a></p>
     </aside>
     <TrainingCompleteDialog open={completionDialogOpen} onPracticeDifferentLines={onBackToSetup}

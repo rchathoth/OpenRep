@@ -107,7 +107,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       assert.match(move, /^[a-h][1-8][a-h][1-8][qrbn]?$/);
       const copy = new Chess(before); copy.move({ from: move.slice(0, 2), to: move.slice(2, 4), promotion: move[4] });
       await h.drop(move.slice(0, 2), move.slice(2, 4));
-      await live.page.getByText(`${(turn + 1) * 2} / 20 half-moves practiced`, { exact: false }).waitFor(); await h.ready();
+      await live.page.waitForFunction(plies => document.querySelector('.session-progress')?.value === plies, (turn + 1) * 2); await h.ready();
       assert.equal(new Chess(await h.fen()).turn(), 'w');
     }
     assert.ok(actions.every(url => url.includes('/api/opening')), 'Only opponent opening lookups may make network requests');
@@ -153,7 +153,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
         await ready();
       }
       await page.getByRole('dialog', { name: 'Good depth reached' }).waitFor();
-      assert.equal(await page.locator('.session-summary').textContent().then(text => text.includes('20 / 20 half-moves practiced')), true);
+      assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '20');
       assert.equal((await calls()).length, 10);
       return { requestCount: (await page.evaluate(() => window.openingMock.calls)).length, fen: await fen() };
     }

@@ -2,6 +2,7 @@
 
 import { useBoardTap } from "@/components/useBoardTap";
 import { boardAppearance } from "@/components/boardAppearance";
+import { Icon } from "@/components/Brand";
 import { useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard, defaultPieces } from "react-chessboard";
@@ -112,26 +113,28 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
       <div className="board-column">
         <div className="screen-heading">
           <h2 id="setup-title">Set up a position</h2>
-          <p>Drag pieces to arrange them, or choose a piece and tap a square.</p>
+          <p>Drag pieces, or choose one and tap a square.</p>
         </div>
-        <div className="board-shell" {...boardTap.handlers}>
-          <Chessboard options={{
-            ...boardAppearance,
-            position,
-            boardOrientation,
-            onPieceDrop,
-            onSquareClick: boardTap.onSquareClick,
-            showAnimations: false,
-            onSquareRightClick: ({ square }) => removePiece(square),
-            allowDragOffBoard: true,
-            allowDragging: !removing,
-          }} />
+        <div className="board-frame">
+          <div className="board-meta"><span><span className={`side-indicator side-${side}`} aria-hidden="true" />{side === "w" ? "White" : "Black"} to move</span></div>
+          <div className="board-shell" {...boardTap.handlers}>
+            <Chessboard options={{
+              ...boardAppearance,
+              position,
+              boardOrientation,
+              onPieceDrop,
+              onSquareClick: boardTap.onSquareClick,
+              showAnimations: false,
+              onSquareRightClick: ({ square }) => removePiece(square),
+              allowDragOffBoard: true,
+              allowDragging: !removing,
+            }} />
+          </div>
         </div>
       </div>
       <aside className="control-panel" aria-label="Position controls">
+        <div className="panel-heading"><h3>Pieces</h3><p className="active-tool" aria-live="polite">{removing ? "Remove mode" : PIECE_NAMES[selectedPiece]}</p></div>
         <div className="panel-section">
-          <h3>Piece to place</h3>
-          <p className="setup-note active-tool" aria-live="polite">{removing ? "Tap a square to remove its piece" : PIECE_NAMES[selectedPiece]}</p>
           {["w", "b"].map((color) => (
             <div key={color} className="palette-group" role="group" aria-label={`${color === "w" ? "White" : "Black"} pieces`}>
               <p className="control-label">{color === "w" ? "White" : "Black"}</p>
@@ -149,7 +152,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             </div>
           ))}
           <button type="button" className="button-secondary remove-toggle" aria-pressed={removing} onClick={() => setRemoving((current) => !current)}>Remove pieces</button>
-          <p className="setup-note">You can also right-click a square to remove a piece.</p>
+          {removing && <p className="setup-note">Tap a square to remove its piece.</p>}
         </div>
         <div className="panel-section side-settings">
           <label className="control-label">I play
@@ -165,14 +168,14 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
           </label>
         </div>
         <div className="panel-section board-actions">
-          <button type="button" className="button-secondary" onClick={() => setBoardOrientation((current) => current === "white" ? "black" : "white")}>Flip board</button>
+          <button type="button" className="button-secondary" onClick={() => setBoardOrientation((current) => current === "white" ? "black" : "white")}><Icon name="flip" />Flip board</button>
           <button type="button" className="button-secondary" onClick={() => {
             setPosition(fenToPosition(STANDARD_FEN)); setSide("w"); setError(null); setRemoving(false);
-          }}>Reset position</button>
+          }}><Icon name="reset" />Reset position</button>
         </div>
         <div className="start-actions">
           {error && <p className="error-message" role="alert">{error}</p>}
-          <button type="button" className="button-primary" onClick={startTraining}>Start training <span aria-hidden="true">→</span></button>
+          <button type="button" className="button-primary" onClick={startTraining}>Start training <Icon name="arrow" /></button>
         </div>
       </aside>
     </section>
