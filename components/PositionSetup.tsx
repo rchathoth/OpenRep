@@ -5,6 +5,7 @@ import { boardAppearance } from "@/components/boardAppearance";
 import { Icon } from "@/components/Brand";
 import { useState } from "react";
 import { Chess } from "chess.js";
+import { availableCastlingRights, CASTLING_OPTIONS, positionToFen } from "@/lib/position";
 import { Chessboard, defaultPieces } from "react-chessboard";
 import type { PositionDataType } from "react-chessboard";
 
@@ -25,22 +26,6 @@ function fenToPosition(fen: string): PositionDataType {
   return position;
 }
 
-function positionToFen(position: PositionDataType, side: Side) {
-  const ranks = Array.from({ length: 8 }, (_, rankIndex) => {
-    let empty = 0; let rank = "";
-    for (let file = 0; file < 8; file += 1) {
-      const piece = position[`${String.fromCharCode(97 + file)}${8 - rankIndex}`];
-      if (!piece) { empty += 1; continue; }
-      if (empty) { rank += empty; empty = 0; }
-      rank += piece.pieceType[0] === "w" ? piece.pieceType[1] : piece.pieceType[1].toLowerCase();
-    }
-    return `${rank}${empty || ""}`;
-  });
-  const placement = ranks.join("/");
-  const rights = placement === STANDARD_FEN.split(" ")[0] ? "KQkq" : "-";
-  return `${placement} ${side} ${rights} - 0 1`;
-}
-
 const PIECE_NAMES: Record<string, string> = {
   wK: "White King",
   wQ: "White Queen",
@@ -58,6 +43,7 @@ const PIECE_NAMES: Record<string, string> = {
 
 export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
   const [position, setPosition] = useState<PositionDataType>(() => fenToPosition(STANDARD_FEN));
+  const [castlingRights, setCastlingRights] = useState("KQkq");
   const [side, setSide] = useState<Side>("w");
   const [playerSide, setPlayerSide] = useState<Side>("w");
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
@@ -85,7 +71,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
       setError("Training positions need exactly one white king and one black king.");
       return;
     }
-    const fen = positionToFen(position, side);
+    const fen = positionToFen(position, side, castlingRights);
     try {
       new Chess(fen);
     } catch {
@@ -169,10 +155,24 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             </select>
           </label>
         </div>
+        <fieldset className="panel-section castling-settings">
+          <legend className="control-label">Castling rights</legend>
+          <p className="setup-note">Allow only if the king and rook have never moved.</p>
+          <div className="castling-options">
+            {CASTLING_OPTIONS.map(({ right, label }) => {
+              const available = availableCastlingRights(position).includes(right);
+              return <label key={right} className="castling-option">
+                <input type="checkbox" checked={available && castlingRights.includes(right)} disabled={!available}
+                  onChange={(event) => setCastlingRights((current) => event.target.checked ? current + right : current.replace(right, ""))} />
+                {label}
+              </label>;
+            })}
+          </div>
+        </fieldset>
         <div className="panel-section board-actions">
           <button type="button" className="button-secondary" onClick={() => setBoardOrientation((current) => current === "white" ? "black" : "white")}><Icon name="flip" />Flip board</button>
           <button type="button" className="button-secondary" onClick={() => {
-            setPosition(fenToPosition(STANDARD_FEN)); setSide("w"); setError(null); setRemoving(false);
+            setPosition(fenToPosition(STANDARD_FEN)); setCastlingRights("KQkq"); setSide("w"); setError(null); setRemoving(false);
           }}><Icon name="reset" />Reset position</button>
         </div>
         <div className="start-actions">

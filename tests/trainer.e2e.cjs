@@ -61,7 +61,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       await page.getByRole('button', { name: 'Start training' }).click();
       if (wait) await ready();
     }
-    async function custom(pieces, mode) {
+    async function custom(pieces, mode, { side = 'w', playerMoves = [], replyMoves = [], disabledRights = [] } = {}) {
       await page.goto(base);
       await page.evaluate(mode => { window.engineMock.mode = mode; }, mode);
       const occupied = await page.locator('[data-square]:has([data-piece])').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-square')));
@@ -70,6 +70,13 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
         await page.getByRole('button', { name: `Place ${piece[0] === 'w' ? 'White' : 'Black'} ${{ K: 'King', Q: 'Queen', R: 'Rook', B: 'Bishop', N: 'Knight', P: 'Pawn' }[piece[1]]}`, exact: true }).click();
         await page.locator(`[data-square="${square}"]`).click();
       }
+      await page.getByLabel('I play').selectOption(side);
+      await page.getByLabel('Side to move').selectOption(side);
+      for (const label of disabledRights) await page.getByLabel(label, { exact: true }).uncheck();
+      await page.evaluate(({ playerMoves, replyMoves }) => {
+        window.engineMock.script = playerMoves;
+        window.engineMock.replies = replyMoves;
+      }, { playerMoves, replyMoves });
       await page.getByRole('button', { name: 'Start training' }).click(); await ready();
     }
     return { fen, ready, drop, start, custom };
@@ -132,6 +139,34 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     assert.deepEqual(await page.locator('.move-pairs li').allTextContents(), ['1.e4c5']);
     assert.equal(await page.locator('.latest-move').textContent(), 'c5');
     console.log('PASS local opponent search and exact player validation');
+    const castlePieces = [['wK','e1'],['wR','a1'],['wR','h1'],['bK','e8'],['bR','a8'],['bR','h8']];
+    for (const [side, from, to, rook, rookTo, replyMove, useTap] of [
+      ['w','e1','g1','h1','f1','e8c8',false],
+      ['w','e1','c1','a1','d1','e8g8',true],
+      ['b','e8','g8','h8','f8','e1c1',true],
+      ['b','e8','c8','a8','d8','e1g1',false],
+    ]) {
+      await custom(castlePieces, 'scripted', { side, playerMoves: [from + rook], replyMoves: [replyMove] });
+      assert.equal((await fen()).split(' ')[2], 'KQkq');
+      if (useTap) await tapMove(from, rook); else await drop(from, to);
+      await ready();
+      const result = new Chess(await fen());
+      assert.equal(result.get(to)?.type, 'k');
+      assert.equal(result.get(rookTo)?.type, 'r');
+      assert.equal(result.get(from), undefined);
+      assert.equal(result.get(rook), undefined);
+      assert.equal(result.fen().split(' ')[2], '-');
+      assert.equal(await page.locator('.move-pairs li').count(), side === 'w' ? 1 : 2);
+      assert.match((await page.locator('.move-pairs li').allTextContents()).join(' '), /O-O/);
+    }
+    await custom(castlePieces, 'scripted', { disabledRights: ['White kingside'] });
+    const noCastle = await fen();
+    assert.equal(noCastle.split(' ')[2], 'Qkq');
+    await drop('e1', 'g1');
+    await page.getByText('That move is not legal in this position.', { exact: true }).waitFor();
+    assert.equal(await fen(), noCastle);
+    assert.equal((await calls()).length, 0);
+    console.log('PASS custom castling rights, all four castles, rook taps, engine normalization and disabled rights');
     const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8','g2g3','g7g5','c3b5','b8c6','b5a7','d8d7','f3d4','f6f5','a2a4','h7h5'];
     async function reachDepth(side) {
       const playerMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 0 : 1));
@@ -171,7 +206,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `Overflow at ${width}`);
       const board = await page.locator('.board-shell').boundingBox();
       assert.ok(Math.abs(board.width - board.height) < 2, `Square board at ${width}`);
-      for (const control of await page.locator('button:visible, select:visible').all()) {
+      for (const control of await page.locator('.app-main button:visible, .app-main select:visible').all()) {
         const box = await control.boundingBox();
         assert.ok(box.height >= 44, `Touch target height at ${width}`);
         assert.ok(box.width >= 44, `Touch target width at ${width}`);

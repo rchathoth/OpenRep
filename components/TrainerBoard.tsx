@@ -9,7 +9,7 @@ import { Icon } from "@/components/Brand";
 import SessionLine from "@/components/SessionLine";
 import ErrorOverlay from "@/components/ErrorOverlay";
 import SuccessOverlay from "@/components/SuccessOverlay";
-import { applyUci, getExpectedMove, toUci } from "@/lib/training";
+import { applyUci, getExpectedMove, normalizeLegalUci } from "@/lib/training";
 import { getOpponentMove } from "@/lib/opponent";
 import { getCompletionReason, MAX_TRAINING_PLIES } from "@/lib/session";
 import TrainingCompleteDialog from "@/components/TrainingCompleteDialog";
@@ -204,9 +204,9 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     setSelectedSquare(null);
     if (!targetSquare || busy || unavailable || pending.current || getCompletionReason(game.current) || !playerTurn) return false;
     const before = game.current.fen();
-    let attempted: string;
-    try { attempted = toUci(new Chess(before).move({ from: sourceSquare, to: targetSquare, promotion })); }
-    catch { setMessage("That move is not legal in this position."); return false; }
+    const isPawn = game.current.get(sourceSquare as Parameters<Chess["get"]>[0])?.type === "p";
+    const attempted = normalizeLegalUci(before, `${sourceSquare}${targetSquare}${isPawn ? promotion : ""}`);
+    if (!attempted) { setMessage("That move is not legal in this position."); return false; }
     setShowError(false);
     setShowSuccess(false);
     if (successTimer.current) clearTimeout(successTimer.current);
@@ -251,6 +251,12 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     if (busy || unavailable || pending.current || complete || !playerTurn || hintLoading || hintAbort.current) return;
     if (square === selectedSquare) { setSelectedSquare(null); return; }
     const piece = game.current.get(square as Parameters<Chess["get"]>[0]);
+    // A legal king-to-rook gesture castles before friendly-piece selection.
+    if (selectedSquare && piece?.color === playerSide &&
+        normalizeLegalUci(game.current.fen(), `${selectedSquare}${square}`)) {
+      attemptMove(selectedSquare, square);
+      return;
+    }
     if (piece?.color === playerSide) { setSelectedSquare(square); return; }
     if (selectedSquare) attemptMove(selectedSquare, square);
   }
