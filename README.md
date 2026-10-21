@@ -4,9 +4,10 @@ A minimal chess trainer using Next.js App Router, React, Tailwind, react-chessbo
 
 ## Design
 
-[design.md](design.md) defines Open Rep's ivory, pastel-green, and serif visual
-system, including the original brand mark, responsive layout, feedback states,
-and accessibility requirements. Shared styling lives in `app/globals.css`, brand
+[DESIGN.md](DESIGN.md) records the Club Modern visual system: muted walnut,
+stone and chalk surfaces, self-hosted Hanken Grotesk, responsive controls, and
+semantic feedback. The machine-readable extensions and component previews live
+in `.impeccable/design.json`. Shared styling lives in `app/globals.css`, SVG brand
 artwork in `components/Brand.tsx`, and board colors in `components/boardAppearance.ts`.
 
 ## Run
@@ -18,11 +19,11 @@ npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. Arrange a position, choose your side, and start training. The board and controls sit side by side on desktop and stack on smaller screens. Choose a piece and tap a square to place it; toggle **Remove pieces** to erase pieces on touch devices. Reset restores the standard position and White to move while retaining your playing side and board orientation. The untouched standard position retains castling rights. Custom arrangements start without castling or en-passant rights. Choose the promotion piece before moving a pawn to the last rank.
+Open http://localhost:3000. Arrange a position, choose your side, and start training. The board and controls sit side by side on desktop and stack on smaller screens. Choose a piece and tap a square to place it; toggle **Remove pieces** to erase pieces on touch devices. Reset restores the standard position and White to move while retaining your playing side and board orientation. Castling rights default to enabled for kings and rooks on their home squares, including custom arrangements. Use the four castling checkboxes to disable rights when a king or rook has previously moved. Blocked paths and attacked squares are checked during training. Custom arrangements start without en-passant rights. Choose the promotion piece before moving a pawn to the last rank.
 
-During training, drag a piece or tap your piece and then its destination. Tap the selected piece again to cancel, or another friendly piece to switch selection. Taps and drops use the same engine validation, including the selected promotion piece. Visual hints remain amber; tap selection has a green outline.
+During training, drag a piece or tap your piece and then its destination. Castle by moving the king two squares or onto its rook. Tap the selected piece again to cancel, or another friendly piece to switch selection. Taps and drops use the same engine validation, including the selected promotion piece. Visual hints remain amber; tap selection has a walnut-brown outline.
 
-A legal attempt is compared to Stockfish's exact best move from the **pre-move** position. Incorrect moves snap back with a red X. A correct move is committed only after engine validation, then the opponent reply is sampled from common Lichess opening moves in proportion to their game counts. If the explorer has no usable legal move or is unavailable, Stockfish searches locally for the reply. Starting as Black uses the same reply flow. Each session ends at checkmate, a draw, or after 20 committed half-moves (10 full moves) from the supplied starting position, regardless of the FEN move number or side to move.
+A legal attempt is compared to Stockfish's exact best move from the **pre-move** position. Incorrect moves snap back with a red X. A correct move is committed only after engine validation, then Stockfish searches up to five opponent candidate lines. From the deepest completed depth, the app samples uniformly among legal moves within 100 centipawns of the best score. Winning mate alternatives must preserve a forced mate; losing mate alternatives cannot allow a faster mate. A sole qualifying move or unavailable exact scores uses the best move. Starting as Black uses the same reply flow. Each session ends at checkmate, a draw, or after 20 committed half-moves (10 full moves) from the supplied starting position, regardless of the FEN move number or side to move.
 
 At the 10-move limit, a dialog offers **Practice different lines** to return to setup or **Review this line** to leave the completed board visible. The dialog does not appear for checkmate or a draw.
 
@@ -34,7 +35,7 @@ After an incorrect legal attempt, a conceptual hint appears below the status. Ch
 
 ## Browser engine
 
-Training uses the lite single-threaded WASM build from the pinned `stockfish@19.0.0` package. The roughly 1.7 MB WASM includes its neural network. The engine's JS/WASM assets download from this app during initialization. Searches, hints, and player move checks remain local; opponent turns request opening frequencies from `/api/opening`. The endpoint uses Lichess standard-chess blitz, rapid, and classical statistics across all rating groups, asks for up to 256 moves, and caches raw upstream statistics for five minutes. The app combines win/draw/loss counts as popularity, keeps the legal moves covering 95% of returned candidate counts, then samples by frequency. Selected moves are not cached. Network errors, timeouts, empty data, or invalid candidates fall back to local Stockfish. The old `/api/eval` route is removed.
+Training uses the lite single-threaded WASM build from the pinned `stockfish@19.0.0` package. The roughly 1.7 MB WASM includes its neural network. The engine's JS/WASM assets download from this app during initialization. Searches, hints, player move checks, and opponent replies all remain local. Player validation and hints use MultiPV 1; opponent turns use up to MultiPV 5. Each search resets this setting, and cancellation drains the stopped search before the next position begins. The unused Lichess opening route and lookup code have been removed.
 
 - `lib/engine/engine-client.ts` owns one reusable worker session, initializes lazily, assigns request IDs, serializes searches, and handles abort signals, timeouts, crashes, and disposal. Its API is `initialize()`, `findBestMove({ fen, movetime?, signal? })`, `stop()`, and `dispose()`.
 - `lib/engine/stockfish.worker.ts` is a small protocol adapter worker with one long-lived child worker running the unmodified upstream engine. `lib/engine/uci.ts` handles the UCI handshake, commands, and `bestmove` parsing entirely off the main thread. Neither worker knows about React or training rules.
@@ -71,6 +72,6 @@ npm run build
 
 With the dev server running, execute `npm run test:e2e`. Repeat against `npm run start` to verify production worker chunk URLs and WASM loading. `npm run demo:engine` runs a standalone real Worker demo that handshakes, searches, stops, and reuses Stockfish while checking main-thread responsiveness; this check is also included in the full browser suite. Set `TEST_URL` to use another server address and `CHROME_PATH` for a Chrome executable other than `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`.
 
-The browser suite initializes the real WASM engine and plays two turns with network access disabled after initialization, checks asset MIME/cache headers, and tests starting as Black and mobile layout. Only opponent opening lookups are allowed during training; player checks and hints stay local, and offline requests fall back to Stockfish. It then uses a test-only Worker replacement injected by Playwright for deterministic database replies, 20-ply completion, incorrect moves, hints, failures/retries, rapid clicks, cancellation, tab suspension, initialization failure, checkmate, draw, and underpromotion. Production code contains no mock-engine switch. Screenshots are saved under `/private/tmp/openreps-*.png`.
+The browser suite initializes the real WASM engine and plays two turns with network access disabled after initialization, checks asset MIME/cache headers, and tests starting as Black and mobile layout. Training makes no network requests after engine initialization. It then uses a test-only Worker replacement injected by Playwright for deterministic engine replies, 20-ply completion, incorrect moves, hints, failures/retries, rapid clicks, cancellation, tab suspension, initialization failure, checkmate, draw, and underpromotion. Production code contains no mock-engine switch. Screenshots are saved under `/private/tmp/openreps-*.png`.
 
 Unit tests cover UCI commands and parsing, settings, request serialization, stale IDs, aborts, stop/drain, timeouts, worker failures, legality, promotion, castling, en passant, and game-over rules. The existing conceptual and visual hint unit tests remain.

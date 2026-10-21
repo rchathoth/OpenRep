@@ -5,6 +5,7 @@ import { boardAppearance } from "@/components/boardAppearance";
 import { Icon } from "@/components/Brand";
 import { useState } from "react";
 import { Chess } from "chess.js";
+import { availableCastlingRights, CASTLING_OPTIONS, positionToFen } from "@/lib/position";
 import { Chessboard, defaultPieces } from "react-chessboard";
 import type { PositionDataType } from "react-chessboard";
 
@@ -25,22 +26,6 @@ function fenToPosition(fen: string): PositionDataType {
   return position;
 }
 
-function positionToFen(position: PositionDataType, side: Side) {
-  const ranks = Array.from({ length: 8 }, (_, rankIndex) => {
-    let empty = 0; let rank = "";
-    for (let file = 0; file < 8; file += 1) {
-      const piece = position[`${String.fromCharCode(97 + file)}${8 - rankIndex}`];
-      if (!piece) { empty += 1; continue; }
-      if (empty) { rank += empty; empty = 0; }
-      rank += piece.pieceType[0] === "w" ? piece.pieceType[1] : piece.pieceType[1].toLowerCase();
-    }
-    return `${rank}${empty || ""}`;
-  });
-  const placement = ranks.join("/");
-  const rights = placement === STANDARD_FEN.split(" ")[0] ? "KQkq" : "-";
-  return `${placement} ${side} ${rights} - 0 1`;
-}
-
 const PIECE_NAMES: Record<string, string> = {
   wK: "White King",
   wQ: "White Queen",
@@ -58,6 +43,7 @@ const PIECE_NAMES: Record<string, string> = {
 
 export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
   const [position, setPosition] = useState<PositionDataType>(() => fenToPosition(STANDARD_FEN));
+  const [castlingRights, setCastlingRights] = useState("KQkq");
   const [side, setSide] = useState<Side>("w");
   const [playerSide, setPlayerSide] = useState<Side>("w");
   const [boardOrientation, setBoardOrientation] = useState<"white" | "black">("white");
@@ -85,7 +71,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
       setError("Training positions need exactly one white king and one black king.");
       return;
     }
-    const fen = positionToFen(position, side);
+    const fen = positionToFen(position, side, castlingRights);
     try {
       new Chess(fen);
     } catch {
@@ -109,14 +95,14 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
     setPosition((current) => ({ ...current, [square]: { pieceType: selectedPiece } })));
 
   return (
-    <section className="workspace" aria-labelledby="setup-title">
+    <section className="workspace setup-workspace" aria-labelledby="setup-title">
       <div className="board-column">
         <div className="screen-heading">
-          <h2 id="setup-title">Set up a position</h2>
+          <h2 id="setup-title">Starting position</h2>
           <p>Drag pieces, or choose one and tap a square.</p>
         </div>
         <div className="board-frame">
-          <div className="board-meta"><span><span className={`side-indicator side-${side}`} aria-hidden="true" />{side === "w" ? "White" : "Black"} to move</span></div>
+          <div className="board-meta"><span className="board-meta-label">Opening practice</span><span><span className={`side-indicator side-${side}`} aria-hidden="true" />{side === "w" ? "White" : "Black"} to move</span></div>
           <div className="board-shell" {...boardTap.handlers}>
             <Chessboard options={{
               ...boardAppearance,
@@ -131,9 +117,11 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             }} />
           </div>
         </div>
+        <div className="board-caption"><span>Arrange your position, then start.</span><span>10 moves per session</span></div>
       </div>
       <aside className="control-panel" aria-label="Position controls">
-        <div className="panel-heading"><h3>Pieces</h3><p className="active-tool" aria-live="polite">{removing ? "Remove mode" : PIECE_NAMES[selectedPiece]}</p></div>
+        <div className="panel-heading"><div><h3>Build your position</h3><p className="panel-description">Choose a piece, then tap a square.</p></div></div>
+        <div className="tool-heading"><span>Piece tools</span><p className="active-tool" aria-live="polite">{removing ? "Remove mode" : PIECE_NAMES[selectedPiece]}</p></div>
         <div className="panel-section">
           {["w", "b"].map((color) => (
             <div key={color} className="palette-group" role="group" aria-label={`${color === "w" ? "White" : "Black"} pieces`}>
@@ -167,15 +155,30 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             </select>
           </label>
         </div>
+        <fieldset className="panel-section castling-settings">
+          <legend className="control-label">Castling rights</legend>
+          <p className="setup-note">Allow only if the king and rook have never moved.</p>
+          <div className="castling-options">
+            {CASTLING_OPTIONS.map(({ right, label }) => {
+              const available = availableCastlingRights(position).includes(right);
+              return <label key={right} className="castling-option">
+                <input type="checkbox" checked={available && castlingRights.includes(right)} disabled={!available}
+                  onChange={(event) => setCastlingRights((current) => event.target.checked ? current + right : current.replace(right, ""))} />
+                {label}
+              </label>;
+            })}
+          </div>
+        </fieldset>
         <div className="panel-section board-actions">
           <button type="button" className="button-secondary" onClick={() => setBoardOrientation((current) => current === "white" ? "black" : "white")}><Icon name="flip" />Flip board</button>
           <button type="button" className="button-secondary" onClick={() => {
-            setPosition(fenToPosition(STANDARD_FEN)); setSide("w"); setError(null); setRemoving(false);
+            setPosition(fenToPosition(STANDARD_FEN)); setCastlingRights("KQkq"); setSide("w"); setError(null); setRemoving(false);
           }}><Icon name="reset" />Reset position</button>
         </div>
         <div className="start-actions">
           {error && <p className="error-message" role="alert">{error}</p>}
           <button type="button" className="button-primary" onClick={startTraining}>Start training <Icon name="arrow" /></button>
+          <p className="start-note">Your moves are checked against Stockfish’s best move. Hints are available as you practice.</p>
         </div>
       </aside>
     </section>

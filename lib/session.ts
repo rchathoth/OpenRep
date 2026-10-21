@@ -1,6 +1,6 @@
 import type { Chess } from "chess.js";
 
-export const MAX_TRAINING_FULL_MOVES = 5;
+export const MAX_TRAINING_FULL_MOVES = 10;
 export const MAX_TRAINING_PLIES = MAX_TRAINING_FULL_MOVES * 2;
 export type CompletionReason = null | "checkmate" | "draw" | "depth-limit";
 

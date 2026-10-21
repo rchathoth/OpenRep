@@ -6,9 +6,10 @@ import { Chessboard } from "react-chessboard";
 import { useBoardTap } from "@/components/useBoardTap";
 import { boardAppearance } from "@/components/boardAppearance";
 import { Icon } from "@/components/Brand";
+import SessionLine from "@/components/SessionLine";
 import ErrorOverlay from "@/components/ErrorOverlay";
 import SuccessOverlay from "@/components/SuccessOverlay";
-import { applyUci, getExpectedMove, toUci } from "@/lib/training";
+import { applyUci, getExpectedMove, normalizeLegalUci } from "@/lib/training";
 import { getOpponentMove } from "@/lib/opponent";
 import { getCompletionReason, MAX_TRAINING_PLIES } from "@/lib/session";
 import TrainingCompleteDialog from "@/components/TrainingCompleteDialog";
@@ -30,9 +31,9 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const game = useRef(new Chess(startingFen));
   const [snapshot, setSnapshot] = useState(() => {
     const initial = new Chess(startingFen);
-    return { fen: startingFen, completionReason: getCompletionReason(initial), plies: 0 };
+    return { fen: startingFen, completionReason: getCompletionReason(initial), plies: 0, moves: initial.history({ verbose: true }) };
   });
-  const { fen, completionReason, plies } = snapshot;
+  const { fen, completionReason, plies, moves } = snapshot;
   const complete = completionReason !== null;
   const initiallyDepthComplete = completionReason === "depth-limit";
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -58,7 +59,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const publish = useCallback(() => {
     setSelectedSquare(null);
     const reason = getCompletionReason(game.current);
-    setSnapshot({ fen: game.current.fen(), completionReason: reason, plies: game.current.history().length });
+    setSnapshot({ fen: game.current.fen(), completionReason: reason, plies: game.current.history().length, moves: game.current.history({ verbose: true }) });
     if (reason) {
       setPhase("ready");
       setHint(null);
@@ -203,9 +204,9 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     setSelectedSquare(null);
     if (!targetSquare || busy || unavailable || pending.current || getCompletionReason(game.current) || !playerTurn) return false;
     const before = game.current.fen();
-    let attempted: string;
-    try { attempted = toUci(new Chess(before).move({ from: sourceSquare, to: targetSquare, promotion })); }
-    catch { setMessage("That move is not legal in this position."); return false; }
+    const isPawn = game.current.get(sourceSquare as Parameters<Chess["get"]>[0])?.type === "p";
+    const attempted = normalizeLegalUci(before, `${sourceSquare}${targetSquare}${isPawn ? promotion : ""}`);
+    if (!attempted) { setMessage("That move is not legal in this position."); return false; }
     setShowError(false);
     setShowSuccess(false);
     if (successTimer.current) clearTimeout(successTimer.current);
@@ -250,6 +251,12 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
     if (busy || unavailable || pending.current || complete || !playerTurn || hintLoading || hintAbort.current) return;
     if (square === selectedSquare) { setSelectedSquare(null); return; }
     const piece = game.current.get(square as Parameters<Chess["get"]>[0]);
+    // A legal king-to-rook gesture castles before friendly-piece selection.
+    if (selectedSquare && piece?.color === playerSide &&
+        normalizeLegalUci(game.current.fen(), `${selectedSquare}${square}`)) {
+      attemptMove(selectedSquare, square);
+      return;
+    }
     if (piece?.color === playerSide) { setSelectedSquare(square); return; }
     if (selectedSquare) attemptMove(selectedSquare, square);
   }
@@ -293,14 +300,14 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const statusKind = complete ? "complete" : unavailable || phase === "error" ? "error" : engineStatus === "starting" ? "starting" : hintLoading ? "thinking" : phase === "checking" ? "checking" : phase === "replying" ? "replying" : message.startsWith("Incorrect") || message.startsWith("That move") ? "incorrect" : "ready";
   const statusTitle = { complete: completionReason === "depth-limit" ? "Practice depth reached" : "Session complete", error: "Needs attention", starting: "Starting engine", thinking: "Finding a hint", checking: "Checking your move", replying: "Opponent’s turn", incorrect: "Try again", ready: "Your turn" }[statusKind];
 
-  return <section className="workspace" aria-labelledby="training-title">
+  return <section className="workspace training-workspace" aria-labelledby="training-title">
     <div className="board-column">
       <div className="screen-heading">
         <h2 id="training-title">Find the strongest move</h2>
         <p>Drag a piece, or tap its start and destination.</p>
       </div>
       <div className="board-frame">
-        <div className="board-meta"><span><span className={`side-indicator side-${sideToMove}`} aria-hidden="true" />{sideToMove === "w" ? "White" : "Black"} to move</span></div>
+        <div className="board-meta"><span className="board-meta-label">Opening practice</span><span><span className={`side-indicator side-${sideToMove}`} aria-hidden="true" />{sideToMove === "w" ? "White" : "Black"} to move</span></div>
         <div className="board-shell" {...boardTap.handlers}
           data-fen={fen}
           data-engine-status={engineStatus}
@@ -325,11 +332,13 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           {!complete && (busy || hintLoading) && <div className="board-status">{engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding a hint…" : phase === "checking" ? "Checking your move…" : "Choosing an opponent reply…"}</div>}
         </div>
       </div>
+      <SessionLine moves={moves} />
     </div>
     <aside className="control-panel training-panel" aria-label="Training controls">
+      <div className="panel-heading"><div><h3>Opening practice</h3><p className="panel-description">One strong move at a time.</p></div></div>
       <div className="session-summary">
         <span className="side-badge">Playing {playerSide === "w" ? "White" : "Black"}</span>
-        <div className="progress-heading"><span>Progress</span><span>{plies}<span className="progress-total"> / {MAX_TRAINING_PLIES}</span></span></div>
+        <div className="progress-heading"><span>Session progress</span><span>{plies}<span className="progress-total"> / {MAX_TRAINING_PLIES}</span></span></div>
         <progress className="session-progress" value={plies} max={MAX_TRAINING_PLIES} aria-label="Half-moves practiced">{plies} / {MAX_TRAINING_PLIES}</progress>
       </div>
       <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
