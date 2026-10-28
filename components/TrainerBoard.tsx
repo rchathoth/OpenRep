@@ -343,7 +343,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       </div>
       <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
         <h3><span className={busy || hintLoading ? "status-dot loading" : "status-dot"} />{statusTitle}</h3>
-        <p>{complete ? completionReason === "depth-limit" ? "Practice depth reached — 10 moves practiced." : `Training complete — ${completionReason}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
+        <p>{complete ? completionReason === "depth-limit" ? "Practice depth reached — 5 moves practiced." : `Training complete — ${completionReason}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
         {phase === "error" && !unavailable && !complete && <div className="retry-row">
           <p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry the engine search." : "Your move was accepted. Retry to play the engine reply."}</p>
           {!playerTurn && <button type="button" className="button-secondary" onClick={() => void run(reply)}>Retry opponent reply</button>}

@@ -117,7 +117,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             }} />
           </div>
         </div>
-        <div className="board-caption"><span>Arrange your position, then start.</span><span>10 moves per session</span></div>
+        <div className="board-caption"><span>Arrange your position, then start.</span><span>5 moves per session</span></div>
       </div>
       <aside className="control-panel" aria-label="Position controls">
         <div className="panel-heading"><div><h3>Build your position</h3><p className="panel-description">Choose a piece, then tap a square.</p></div></div>

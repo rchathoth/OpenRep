@@ -167,21 +167,21 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     assert.equal(await fen(), noCastle);
     assert.equal((await calls()).length, 0);
     console.log('PASS custom castling rights, all four castles, rook taps, engine normalization and disabled rights');
-    const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8','g2g3','g7g5','c3b5','b8c6','b5a7','d8d7','f3d4','f6f5','a2a4','h7h5'];
+    const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8'];
     async function reachDepth(side) {
       const playerMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 0 : 1));
       const replyMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 1 : 0));
       await start(side, 'scripted', true, replyMoves, playerMoves);
-      for (let turn = 0; turn < 10; turn++) {
+      for (let turn = 0; turn < 5; turn++) {
         const uci = playerMoves[turn];
         await drop(uci.slice(0, 2), uci.slice(2, 4));
         await ready();
       }
       await page.getByRole('dialog', { name: 'Good depth reached' }).waitFor();
-      assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '20');
-      assert.equal((await calls()).length, 20);
-      assert.equal(await page.locator('.move-pairs li').count(), 10);
-      assert.equal(await page.locator('.latest-move').textContent(), 'h5');
+      assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '10');
+      assert.equal((await calls()).length, 10);
+      assert.equal(await page.locator('.move-pairs li').count(), 5);
+      assert.equal(await page.locator('.latest-move').textContent(), side === 'w' ? 'a6' : 'Nb8');
       return { requestCount: (await calls()).filter(call => call.multiPV > 1).length, fen: await fen() };
     }
     const depthWhite = await reachDepth('w');
@@ -195,10 +195,10 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     await page.getByRole('button', { name: 'Setup', exact: true }).click();
     await page.getByRole('button', { name: 'Start training' }).waitFor();
     const depthBlack = await reachDepth('b');
-    assert.equal(depthBlack.requestCount, 10, 'The final player move must not request another opponent reply');
+    assert.equal(depthBlack.requestCount, 5, 'The fifth player move still receives the fifth reply within the 10-ply cap');
     await page.getByRole('dialog', { name: 'Good depth reached' }).getByRole('button', { name: 'Practice different lines' }).click();
     await page.getByRole('button', { name: 'Start training' }).waitFor();
-    console.log('PASS 20-ply cap, completion dialog, keyboard dismissal, locked review, and return to setup');
+    console.log('PASS 10-ply cap, completion dialog, keyboard dismissal, locked review, and return to setup');
     async function layout(width) {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(350);

@@ -28,7 +28,7 @@ export default function Home() {
                 <li>Find Stockfish’s best move. Use a hint when you need one.</li>
                 <li>Practice against varied replies, then review your line.</li>
               </ol>
-              <p>Each session runs for up to ten full moves.</p>
+              <p>Each session runs for up to five full moves.</p>
             </div>
           </details>
         </div>

@@ -30,7 +30,7 @@ Preserve these user-confirmed product rules:
 - Player validation and hints use Stockfish's exact best move with MultiPV 1. An unchanged position reuses its validated result.
 - Opponent turns request up to five candidate lines. Use the deepest completed search and sample uniformly among legal moves within 100 centipawns of the best score.
 - Winning mate alternatives must preserve forced mate; losing mate alternatives cannot allow a faster mate. Use the best move when only one qualifies or exact scores are unavailable.
-- Sessions end at checkmate, a draw, or 20 committed half-moves (ten full moves) from the starting position.
+- Sessions end at checkmate, a draw, or 10 committed half-moves (five full moves) from the starting position.
 - Preserve hints, promotion selection, cancellation, stale-result protection, and opponent-reply retry without replaying an accepted player move.
 - Keep desktop and mobile web support. Current implementation uses Next.js, React, TypeScript, chess.js, and pinned Stockfish assets.
 

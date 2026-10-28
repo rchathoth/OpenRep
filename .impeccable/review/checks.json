@@ -1,0 +1,37 @@
+{
+  "320": {
+    "overflow": false,
+    "board": 272,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  },
+  "390": {
+    "overflow": false,
+    "board": 342,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  },
+  "663": {
+    "overflow": false,
+    "board": 591,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  },
+  "1000": {
+    "overflow": false,
+    "board": 532,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  },
+  "1280": {
+    "overflow": false,
+    "board": 616,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  },
+  "1440": {
+    "overflow": false,
+    "board": 616,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  },
+  "1600": {
+    "overflow": false,
+    "board": 616,
+    "font": "\"Hanken Grotesk\", Arial, sans-serif"
+  }
+}
