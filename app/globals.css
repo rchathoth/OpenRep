@@ -276,3 +276,21 @@ h3 { font-size: 18px; font-weight: 600; }
 .castling-option { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; cursor: pointer; }
 .castling-option input { width: 18px; height: 18px; accent-color: var(--accent-ink); }
 .castling-option:has(input:disabled) { opacity: .5; cursor: default; }
+
+/* Saved positions */
+.home-panel { background: var(--surface, #fcfaf7); border: 1px solid #cdc3b9; border-radius: 12px; padding: clamp(24px, 4vw, 48px); }
+.home-intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding-bottom: 32px; border-bottom: 1px solid #cdc3b9; }
+.home-intro h2 { font-size: 28px; font-weight: 650; letter-spacing: -.025em; margin: 4px 0 8px; }
+.home-intro p, .saved-line p, .home-empty p, .storage-note { color: #65594f; }
+.home-eyebrow { font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; }
+.home-empty { padding: 36px 0; }
+.home-empty p { margin-top: 6px; }
+.saved-lines { list-style: none; padding: 0; margin: 0; }
+.saved-line { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px 0; border-bottom: 1px solid #e3dbd3; }
+.saved-line h3 { font-size: 20px; font-weight: 650; margin: 0 0 4px; }
+.saved-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.saved-line-info form { display: grid; gap: 10px; }
+.position-name { display: grid; gap: 8px; padding: 0 0 18px; }
+.storage-note { font-size: 13px; margin-top: 24px; }
+.storage-error { margin-bottom: 16px; }
+@media (max-width: 700px) { .home-intro, .saved-line { align-items: stretch; flex-direction: column; } .home-intro .button-primary { align-self: flex-start; } }
