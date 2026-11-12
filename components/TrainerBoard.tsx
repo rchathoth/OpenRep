@@ -18,7 +18,7 @@ import type { EngineStatus } from "@/lib/engine/types";
 import { ENGINE_ASSET_PATH } from "@/lib/engine/settings";
 import { classifyHint, hintText, parseMoveHint, type HintClassification, type HintStage } from "@/lib/hints";
 
-type TrainerBoardProps = { startingFen: string; playerSide: "w" | "b"; boardOrientation: "white" | "black"; onBackToSetup: () => void };
+type TrainerBoardProps = { startingFen: string; playerSide: "w" | "b"; boardOrientation: "white" | "black"; onBackToSetup: () => void; onPracticeAgain: () => void; onComplete: (moves: string[]) => void };
 type Phase = "ready" | "checking" | "replying" | "error";
 
 export default function TrainerBoard(props: TrainerBoardProps) {
@@ -26,7 +26,7 @@ export default function TrainerBoard(props: TrainerBoardProps) {
   return <TrainingSession key={`${props.startingFen}:${props.playerSide}`} {...props} />;
 }
 
-function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSetup }: TrainerBoardProps) {
+function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSetup, onPracticeAgain, onComplete }: TrainerBoardProps) {
   // Preserve move history so repetition and other game-over rules still work.
   const game = useRef(new Chess(startingFen));
   const [snapshot, setSnapshot] = useState(() => {
@@ -56,11 +56,18 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
   const pending = useRef<AbortController | null>(null);
   const hintAbort = useRef<AbortController | null>(null);
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const completionRecorded = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   const publish = useCallback(() => {
     setSelectedSquare(null);
     const reason = getCompletionReason(game.current);
     setSnapshot({ fen: game.current.fen(), completionReason: reason, plies: game.current.history().length, moves: game.current.history({ verbose: true }) });
     if (reason) {
+      if (!completionRecorded.current && game.current.history().length > 0) {
+        completionRecorded.current = true;
+        onCompleteRef.current(game.current.history({ verbose: true }).map((move) => `${move.from}${move.to}${move.promotion ?? ""}`));
+      }
       setPhase("ready");
       setHint(null);
       setHintStage(0);
@@ -343,7 +350,7 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
       </div>
       <div className={`status-card status-${statusKind}`} aria-live="polite" aria-atomic="true">
         <h3><span className={busy || hintLoading ? "status-dot loading" : "status-dot"} />{statusTitle}</h3>
-        <p>{complete ? completionReason === "depth-limit" ? "Practice depth reached — 10 moves practiced." : `Training complete — ${completionReason}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
+        <p>{complete ? completionReason === "depth-limit" ? "Practice depth reached — 5 moves practiced." : `Training complete — ${completionReason}.` : unavailable ? "Engine unavailable; reload to retry." : engineStatus === "starting" ? "Starting engine…" : hintLoading ? "Finding the best move for your hint…" : message}</p>
         {phase === "error" && !unavailable && !complete && <div className="retry-row">
           <p className="setup-note">{playerTurn ? "Your move was not accepted. Try it again to retry the engine search." : "Your move was accepted. Retry to play the engine reply."}</p>
           {!playerTurn && <button type="button" className="button-secondary" onClick={() => void run(reply)}>Retry opponent reply</button>}
@@ -367,10 +374,10 @@ function TrainingSession({ startingFen, playerSide, boardOrientation, onBackToSe
           </select>
         </label>
       </div>
-      <button ref={setupButton} type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}><Icon name="reset" />Setup</button>
+      <button ref={setupButton} type="button" className={complete ? "button-primary" : "button-secondary"} onClick={() => { setSelectedSquare(null); onBackToSetup(); }}><Icon name="reset" />Home</button>
       <p className="engine-footer">Stockfish 19 · <a href={`${ENGINE_ASSET_PATH}/COPYING.txt`} target="_blank" rel="noreferrer">GPLv3</a> · <a href={`${ENGINE_ASSET_PATH}/SOURCE.txt`} target="_blank" rel="noreferrer">Source code &amp; notices</a></p>
     </aside>
-    <TrainingCompleteDialog open={completionDialogOpen} onPracticeDifferentLines={onBackToSetup}
+    <TrainingCompleteDialog open={completionDialogOpen} onPracticeDifferentLines={onPracticeAgain}
       onReview={() => setCompletionDialogOpen(false)} returnFocusRef={setupButton} />
   </section>;
 }

@@ -9,7 +9,7 @@ import { availableCastlingRights, CASTLING_OPTIONS, positionToFen } from "@/lib/
 import { Chessboard, defaultPieces } from "react-chessboard";
 import type { PositionDataType } from "react-chessboard";
 
-type PositionSetupProps = { onStartTraining: (fen: string, playerSide: Side, boardOrientation: "white" | "black") => void };
+type PositionSetupProps = { onStartTraining: (name: string, fen: string, playerSide: Side, boardOrientation: "white" | "black") => void; onBack: () => void };
 type Side = "w" | "b";
 const STANDARD_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const palette = ["wK", "wQ", "wR", "wB", "wN", "wP", "bK", "bQ", "bR", "bB", "bN", "bP"];
@@ -41,7 +41,8 @@ const PIECE_NAMES: Record<string, string> = {
   bP: "Black Pawn",
 };
 
-export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
+export default function PositionSetup({ onStartTraining, onBack }: PositionSetupProps) {
+  const [name, setName] = useState("");
   const [position, setPosition] = useState<PositionDataType>(() => fenToPosition(STANDARD_FEN));
   const [castlingRights, setCastlingRights] = useState("KQkq");
   const [side, setSide] = useState<Side>("w");
@@ -65,6 +66,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
   }
 
   function startTraining() {
+    if (!name.trim()) { setError("Give this position a name."); return; }
     const whiteKing = Object.values(position).filter(({ pieceType }) => pieceType === "wK").length;
     const blackKing = Object.values(position).filter(({ pieceType }) => pieceType === "bK").length;
     if (whiteKing !== 1 || blackKing !== 1) {
@@ -79,7 +81,7 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
       return;
     }
     setError(null);
-    onStartTraining(fen, playerSide, boardOrientation);
+    onStartTraining(name.trim(), fen, playerSide, boardOrientation);
   }
 
   function removePiece(square: string) {
@@ -117,10 +119,11 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
             }} />
           </div>
         </div>
-        <div className="board-caption"><span>Arrange your position, then start.</span><span>10 moves per session</span></div>
+        <div className="board-caption"><span>Arrange your position, then start.</span><span>5 moves per session</span></div>
       </div>
       <aside className="control-panel" aria-label="Position controls">
         <div className="panel-heading"><div><h3>Build your position</h3><p className="panel-description">Choose a piece, then tap a square.</p></div></div>
+        <label className="control-label position-name">Position name<input className="select-control" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} placeholder="e.g. Sicilian Defense" /></label>
         <div className="tool-heading"><span>Piece tools</span><p className="active-tool" aria-live="polite">{removing ? "Remove mode" : PIECE_NAMES[selectedPiece]}</p></div>
         <div className="panel-section">
           {["w", "b"].map((color) => (
@@ -177,7 +180,8 @@ export default function PositionSetup({ onStartTraining }: PositionSetupProps) {
         </div>
         <div className="start-actions">
           {error && <p className="error-message" role="alert">{error}</p>}
-          <button type="button" className="button-primary" onClick={startTraining}>Start training <Icon name="arrow" /></button>
+          <button type="button" className="button-primary" onClick={startTraining}>Save and start training <Icon name="arrow" /></button>
+          <button type="button" className="button-secondary" onClick={onBack}>Back to home</button>
           <p className="start-note">Your moves are checked against Stockfish’s best move. Hints are available as you practice.</p>
         </div>
       </aside>

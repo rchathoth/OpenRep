@@ -26,7 +26,7 @@ export default function TrainingCompleteDialog({ open, onPracticeDifferentLines,
     onClose={() => { if (open) onReview(); }}>
     <span className="dialog-brand"><BrandMark /></span>
     <h2 id="training-complete-title">Good depth reached</h2>
-    <p id="training-complete-description">10 moves practiced. Explore another line or review this one.</p>
+    <p id="training-complete-description">5 moves practiced. Explore another line or review this one.</p>
     <div className="dialog-actions">
       <button ref={primary} type="button" className="button-primary" onClick={onPracticeDifferentLines}>Practice different lines<Icon name="arrow" /></button>
       <button type="button" className="button-secondary" onClick={onReview}>Review this line</button>

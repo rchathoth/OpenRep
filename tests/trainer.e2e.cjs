@@ -55,14 +55,18 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     }
     async function start(side = 'w', mode = 'ok', wait = true, replyMoves = [], playerMoves = []) {
       await page.goto(base);
+      await page.getByRole('button', { name: 'Build your line' }).click();
+      await page.getByLabel('Position name').fill('Test position');
       await page.evaluate(mode => { if (window.engineMock) window.engineMock.mode = mode; }, mode);
       await page.evaluate(({ replyMoves, playerMoves }) => { if (window.engineMock) { window.engineMock.script = playerMoves; window.engineMock.replies = replyMoves.map(move => typeof move === 'string' ? move : move.uci); } }, { replyMoves, playerMoves });
       if (side === 'b') await page.getByLabel('I play').selectOption('b');
-      await page.getByRole('button', { name: 'Start training' }).click();
+      await page.getByRole('button', { name: 'Save and start training' }).click();
       if (wait) await ready();
     }
     async function custom(pieces, mode, { side = 'w', playerMoves = [], replyMoves = [], disabledRights = [] } = {}) {
       await page.goto(base);
+      await page.getByRole('button', { name: 'Build your line' }).click();
+      await page.getByLabel('Position name').fill('Test position');
       await page.evaluate(mode => { window.engineMock.mode = mode; }, mode);
       const occupied = await page.locator('[data-square]:has([data-piece])').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-square')));
       for (const square of occupied) await page.locator(`[data-square="${square}"]`).click({ button: 'right' });
@@ -77,7 +81,7 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
         window.engineMock.script = playerMoves;
         window.engineMock.replies = replyMoves;
       }, { playerMoves, replyMoves });
-      await page.getByRole('button', { name: 'Start training' }).click(); await ready();
+      await page.getByRole('button', { name: 'Save and start training' }).click(); await ready();
     }
     return { fen, ready, drop, start, custom };
   }
@@ -167,38 +171,39 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     assert.equal(await fen(), noCastle);
     assert.equal((await calls()).length, 0);
     console.log('PASS custom castling rights, all four castles, rook taps, engine normalization and disabled rights');
-    const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8','g2g3','g7g5','c3b5','b8c6','b5a7','d8d7','f3d4','f6f5','a2a4','h7h5'];
+    const depthLine = ['g1f3','b8a6','f3g1','d7d6','g1f3','d6d5','h2h4','f7f6','b1c3','a6b8'];
     async function reachDepth(side) {
       const playerMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 0 : 1));
       const replyMoves = depthLine.filter((_, index) => index % 2 === (side === 'w' ? 1 : 0));
       await start(side, 'scripted', true, replyMoves, playerMoves);
-      for (let turn = 0; turn < 10; turn++) {
+      for (let turn = 0; turn < 5; turn++) {
         const uci = playerMoves[turn];
         await drop(uci.slice(0, 2), uci.slice(2, 4));
         await ready();
       }
       await page.getByRole('dialog', { name: 'Good depth reached' }).waitFor();
-      assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '20');
-      assert.equal((await calls()).length, 20);
-      assert.equal(await page.locator('.move-pairs li').count(), 10);
-      assert.equal(await page.locator('.latest-move').textContent(), 'h5');
+      assert.equal(await page.getByRole('progressbar', { name: 'Half-moves practiced' }).getAttribute('value'), '10');
+      assert.equal((await calls()).length, 10);
+      assert.equal(await page.locator('.move-pairs li').count(), 5);
+      assert.equal(await page.locator('.latest-move').textContent(), 'Nb8');
       return { requestCount: (await calls()).filter(call => call.multiPV > 1).length, fen: await fen() };
     }
     const depthWhite = await reachDepth('w');
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('openrep.saved-lines.v1')).at(-1).completedLines.length), 1);
     const completionDialog = page.getByRole('dialog', { name: 'Good depth reached' });
     await completionDialog.getByRole('button', { name: 'Practice different lines' }).focus();
     assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Practice different lines');
     await page.keyboard.press('Escape'); await completionDialog.waitFor({ state: 'hidden' });
-    assert.equal(await page.getByRole('button', { name: 'Setup', exact: true }).evaluate(button => document.activeElement === button), true);
+    assert.equal(await page.getByRole('button', { name: 'Home', exact: true }).evaluate(button => document.activeElement === button), true);
     assert.equal(await page.getByRole('button', { name: 'Hint', exact: true }).isDisabled(), true);
     assert.equal(await fen(), depthWhite.fen);
-    await page.getByRole('button', { name: 'Setup', exact: true }).click();
-    await page.getByRole('button', { name: 'Start training' }).waitFor();
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await page.getByRole('button', { name: 'Build your line' }).waitFor();
     const depthBlack = await reachDepth('b');
-    assert.equal(depthBlack.requestCount, 10, 'The final player move must not request another opponent reply');
+    assert.equal(depthBlack.requestCount, 5, 'The fifth player move still receives the fifth reply within the 10-ply cap');
     await page.getByRole('dialog', { name: 'Good depth reached' }).getByRole('button', { name: 'Practice different lines' }).click();
-    await page.getByRole('button', { name: 'Start training' }).waitFor();
-    console.log('PASS 20-ply cap, completion dialog, keyboard dismissal, locked review, and return to setup');
+    await ready();
+    console.log('PASS 10-ply cap, completion dialog, keyboard dismissal, locked review, and return to setup');
     async function layout(width) {
       await page.setViewportSize({ width, height: 1000 });
       await page.waitForTimeout(350);
@@ -214,13 +219,15 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     }
 
     await page.goto(base);
+    await page.getByRole('button', { name: 'Build your line' }).click();
+    await page.getByLabel('Position name').fill('Mobile position');
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('button', { name: 'Remove pieces', exact: true }).tap();
     await page.waitForFunction(() => document.querySelector('.remove-toggle').getAttribute('aria-pressed') === 'true');
     await tap('e1'); await tap('e3');
 
     assert.equal(await page.locator('[data-square="e1"] [data-piece]').count(), 0);
-    await page.getByRole('button', { name: 'Start training' }).tap();
+    await page.getByRole('button', { name: 'Save and start training' }).tap();
     await page.getByRole('alert').getByText('Training positions need exactly one white king and one black king.').waitFor();
     await page.getByRole('button', { name: 'Place White King', exact: true }).tap();
     assert.equal(await page.getByRole('button', { name: 'Remove pieces', exact: true }).getAttribute('aria-pressed'), 'false');
@@ -242,8 +249,8 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
       await layout(width); await shot(`setup-${width}`);
     }
     await page.keyboard.press('Tab');
-    await page.getByRole('button', { name: 'Start training' }).focus();
-    assert.equal(await page.getByRole('button', { name: 'Start training' }).evaluate(button => getComputedStyle(button).outlineStyle), 'solid');
+    await page.getByRole('button', { name: 'Save and start training' }).focus();
+    assert.equal(await page.getByRole('button', { name: 'Save and start training' }).evaluate(button => getComputedStyle(button).outlineStyle), 'solid');
     console.log('PASS touch editing, validation, reset, orientation and setup layouts');
 
     await start(); const tapInitial = await fen();
@@ -342,12 +349,12 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
 
     await start(); await page.evaluate(() => { window.engineMock.delay = 1000; });
     await drop('e2', 'e4'); assert.equal(await fen(), initial, 'Never commit before engine validation');
-    await page.getByRole('button', { name: 'Setup', exact: true }).click();
-    await page.getByRole('button', { name: 'Start training' }).waitFor();
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await page.getByRole('button', { name: 'Build your line' }).waitFor();
     await page.waitForTimeout(1100);
     assert.ok((await page.evaluate(() => window.engineMock.terminated)) >= 1);
     assert.equal(await page.locator('[data-engine-status]').count(), 0);
-    await page.getByRole('button', { name: 'Start training' }).click(); await ready(); assert.equal(await fen(), initial);
+    await page.getByRole('button', { name: 'Practice', exact: true }).last().click(); await ready(); assert.equal(await fen(), initial);
     console.log('PASS leaving while thinking terminates engine and ignores old results');
 
     await start(); await page.evaluate(() => { window.engineMock.delay = 1000; });
@@ -366,9 +373,11 @@ const base = process.env.TEST_URL || 'http://localhost:3000';
     console.log('PASS tab suspension cancels without committing; retry resumes');
 
     await page.goto(base);
+    await page.getByRole('button', { name: 'Build your line' }).click();
+    await page.getByLabel('Position name').fill('Black position');
     await page.evaluate(() => { window.engineMock.initDelay = 750; });
     await page.getByLabel('I play').selectOption('b');
-    await page.getByRole('button', { name: 'Start training' }).click();
+    await page.getByRole('button', { name: 'Save and start training' }).click();
     await page.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
       document.dispatchEvent(new Event('visibilitychange'));
