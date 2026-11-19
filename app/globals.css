@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @font-face {
-  font-family: "Hanken Grotesk";
-  src: url("/fonts/hanken-grotesk/HankenGrotesk-Variable.ttf") format("truetype");
+  font-family: "DM Sans";
+  src: url("/fonts/dm-sans/DMSans-Variable.ttf") format("truetype");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  --display-font: "Hanken Grotesk", Arial, sans-serif;
+  --display-font: "DM Sans", Arial, sans-serif;
   --page: #eae6e1;
   --surface: #fcfaf7;
   --text: #292521;
